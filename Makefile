@@ -1,23 +1,25 @@
 # CC=gcc-13 -std=c99 -Wall -Wextra
 COVARGS=--coverage -fprofile-arcs -ftest-coverage
 CCARGS=-std=c99 -Weverything -Wno-poison-system-directories
-CC=clang
+CC=clang -v
 CFILES=src/util/*.c src/srcmetrics/*.c
 INCLUDES=-Iinclude
+LIBRARIES=-lsrcml
 DEBUGFLAGS=-g
+SRCMETRICS=src/srcmetrics.c
 EXEC=bin/srcmetrics
-DEBUG=${CC} ${COVARGS} ${CCARGS} ${DEBUGFLAGS} ${INCLUDES} ${CFILES}
+DEBUG=${CC} ${COVARGS} ${CCARGS} ${DEBUGFLAGS} ${INCLUDES} ${LIBRARIES} ${CFILES}
 
 release: bin compile
 
 debug: clean bin; @\
-    ${DEBUG} src/main.c -o ${EXEC}
+    ${DEBUG} ${SRCMETRICS} -o ${EXEC}
 
 bin: ; @\
     mkdir bin
 
 compile: ; @\
-    ${CC} ${CCARGS} ${INCLUDES} ${CFILES} src/main.c -o ${EXEC}
+    ${CC} ${CCARGS} ${INCLUDES} ${LIBRARIES} ${CFILES} ${SRCMETRICS} -o ${EXEC}
 
 tests: test230619
 

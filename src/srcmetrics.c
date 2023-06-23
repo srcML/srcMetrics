@@ -1,8 +1,11 @@
+/**
+ */
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <srcml.h>
 #include "srcmetrics/options.h"
 #include "srcmetrics/version.h"
 #include "util/streq.h"
@@ -19,6 +22,10 @@ static void free_infiles(void) {
     free(options.infiles);
 }
 
+static void showCopyrightMessage(void) {
+    fputs("Copyright (C) srcML, LLC. (www.srcML.org)\n", stderr);
+}
+
 static void showLongHelpMessage(void) {
     fputs("Usage: srcmetrics [options] <src_infile>... [-o <srcMetrics_outfile>]\n", stderr);
     fputs("       srcmetrics [options] <srcML_infile>... [-o <srcMetrics_outfile>]\n", stderr);
@@ -32,6 +39,7 @@ static void showLongHelpMessage(void) {
     fputs("  -h,--help                  Output this help message and exit\n", stderr);
     fputs("  -V,--version               Output version number and exit\n", stderr);
     fputs("  -v,--verbose               Status information to stderr\n", stderr);
+    fputs("  -c,--copyright             Output the copyright message and exit\n", stderr);
     fputs("  -q,--quiet                 Suppress status messages\n", stderr);
     fputs("  -o,--output FILE           Write output to FILE\n", stderr);
     fputs("  -l,--language LANG         Set the source-code language to C\n", stderr);
@@ -55,7 +63,10 @@ static void showShortHelpMessage(void) {
     fputs("srcmetrics typically accepts input from pipe, not a terminal\n", stderr);
     fputs("Typical usage includes:\n", stderr);
     fputs("\n", stderr);
-    fputs("    # compute Cyclomatic Complexity of a source file and save it to a report file\n", stderr);
+    fputs("    # compute all non-graph metrics of a source file and save it to standard out\n", stderr);
+    fputs("    srcmetrics main.c\n", stderr);
+    fputs("\n", stderr);
+    fputs("    # compute only Cyclomatic Complexity of a source file and save it to a report file\n", stderr);
     fputs("    srcmetrics main.c -m CC -o report.csv\n", stderr);
     fputs("\n", stderr);
     fputs("See `srcmetrics --help` for more information\n", stderr);
@@ -63,6 +74,7 @@ static void showShortHelpMessage(void) {
 
 static void showVersion(void) {
     fputs("srcmetrics "VERSION_SRCMETRICS"\n", stderr);
+    fprintf(stderr, "libsrcml %s\n", srcml_get_version());
 }
 
 int main(int argc, char* argv[]) {
@@ -96,6 +108,9 @@ int main(int argc, char* argv[]) {
                     case 'V':
                         showVersion();
                         return EXIT_SUCCESS;
+                    case 'c':
+                        showCopyrightMessage();
+                        return EXIT_SUCCESS;
                     case 'l':
                         dash_continues = 0;
                         if (*(++option) == '=' && *(++option)) {
@@ -120,6 +135,9 @@ int main(int argc, char* argv[]) {
                             return EXIT_SUCCESS;
                         } else if (str_eq_const(option, "version")) {
                             showVersion();
+                            return EXIT_SUCCESS;
+                        } else if (str_eq_const(option, "copyright")) {
+                            showCopyrightMessage();
                             return EXIT_SUCCESS;
                         } else if (str_eq_const(option, "language=")) {
                             options.language = option + sizeof("language");
