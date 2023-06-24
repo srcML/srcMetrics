@@ -5,7 +5,15 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <srcml.h>
+
+extern const unsigned int SRCML_OPTION_NO_XML_DECL;
+extern const unsigned int SRCML_OPTION_POSITION;
+extern const unsigned int SRCML_OPTION_CPP;
+extern const unsigned int SRCML_OPTION_CPP_TEXT_ELSE;
+extern const unsigned int SRCML_OPTION_CPP_MARKUP_IF0;
+extern const unsigned int SRCML_OPTION_STORE_ENCODING;
+#include "libsrcml/srcml.h"
+
 #include "srcmetrics/options.h"
 #include "srcmetrics/version.h"
 #include "util/streq.h"
@@ -74,7 +82,7 @@ static void showShortHelpMessage(void) {
 
 static void showVersion(void) {
     fputs("srcmetrics "VERSION_SRCMETRICS"\n", stderr);
-    fprintf(stderr, "libsrcml %s\n", srcml_get_version());
+    fprintf(stderr, "libsrcml %s\n", srcml_version_string()); /*, srcml_version_number());*/
 }
 
 int main(int argc, char* argv[]) {
@@ -152,7 +160,7 @@ int main(int argc, char* argv[]) {
                         }
                         break;
                     default:
-                        fprintf(stderr, "Unknown option %c in argument = %s\n", *(option), *arg);
+                        fprintf(stderr, "Unknown option '%c' in argument = %s\n", *(option), *arg);
                         break;
                 }
             }
