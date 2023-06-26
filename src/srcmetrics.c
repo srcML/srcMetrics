@@ -1,4 +1,29 @@
 /**
+ * @file srcmetrics.c
+ *
+ * @copyright Copyright (C) 2023 srcML, LLC. (www.srcML.org)
+ *
+ * The srcML Toolkit is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * The srcML Toolkit is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with the srcML Toolkit; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
+
+/**
+ * @mainpage srcmetrics
+ *
+ * The functions in srcmetrics are for the purposes of:
+ *
+ * * Obtaining static metrcis from the source code and its control-flow/call graphs.
  */
 #include <ctype.h>
 #include <stdbool.h>
@@ -13,27 +38,28 @@ extern const unsigned int SRCML_OPTION_CPP_TEXT_ELSE;
 extern const unsigned int SRCML_OPTION_CPP_MARKUP_IF0;
 extern const unsigned int SRCML_OPTION_STORE_ENCODING;
 #include "libsrcml/srcml.h"
+#include "libsrcsax/srcsax.h"
+#include "libsrcsax/srcsax_handler.h"
 
 #include "srcmetrics/options.h"
 #include "srcmetrics/version.h"
+#include "util/chunk.h"
 #include "util/streq.h"
 #include "util/unless.h"
 #include "util/until.h"
 
 static Options options;
+static Chunk strings;
 
 /* Functions called @ exit */
-static void putFinalNewLine(void) {
-    fputs("\n", stderr);
-}
-static void free_infiles(void) {
-    free(options.infiles);
-}
+static void putFinalNewLine(void)   { fputs("\n", stderr); }
+static void free_infiles(void)      { free(options.infiles); }
+static void free_strings(void)      { free_chunk(&strings); }
 
+/* Message functions */
 static void showCopyrightMessage(void) {
-    fputs("Copyright (C) srcML, LLC. (www.srcML.org)\n", stderr);
+    fputs("Copyright (C) 2023 srcML, LLC. (www.srcML.org)\n", stderr);
 }
-
 static void showLongHelpMessage(void) {
     fputs("Usage: srcmetrics [options] <src_infile>... [-o <srcMetrics_outfile>]\n", stderr);
     fputs("       srcmetrics [options] <srcML_infile>... [-o <srcMetrics_outfile>]\n", stderr);
@@ -51,8 +77,8 @@ static void showLongHelpMessage(void) {
     fputs("  -q,--quiet                 Suppress status messages\n", stderr);
     fputs("  -o,--output FILE           Write output to FILE\n", stderr);
     fputs("  -l,--language LANG         Set the source-code language to C\n", stderr);
-    fputs("  --files-from FILE          Input source-code filenames from FILE\n", stderr);
-    fputs("  --src-encoding ENCODING    Set the input source-code encoding\n", stderr);
+    fputs("  --files-from FILE          Input source-code filenames from FILE instead of command-line arguments\n", stderr);
+    /*fputs("  --src-encoding ENCODING    Set the input source-code encoding\n", stderr);*/
     fputs("\n", stderr);
     fputs("SRCMETRICS:\n", stderr);
     fputs("  -m,--metric METRIC         Report this METRIC if possible, excludes all unspecified metrics\n", stderr);
@@ -66,7 +92,6 @@ static void showLongHelpMessage(void) {
     fputs("Contact us at www.srcml.org/support.html\n", stderr);
     fputs("www.srcML.org\n", stderr);
 }
-
 static void showShortHelpMessage(void) {
     fputs("srcmetrics typically accepts input from pipe, not a terminal\n", stderr);
     fputs("Typical usage includes:\n", stderr);
@@ -79,10 +104,36 @@ static void showShortHelpMessage(void) {
     fputs("\n", stderr);
     fputs("See `srcmetrics --help` for more information\n", stderr);
 }
-
 static void showVersion(void) {
     fputs("srcmetrics "VERSION_SRCMETRICS"\n", stderr);
     fprintf(stderr, "libsrcml %s\n", srcml_version_string()); /*, srcml_version_number());*/
+}
+
+/* Gets infiles using the file given with '--files-from' argument' */
+static bool getInfilesFromFile(char const* const restrict filename) {
+    char infile[BUFSIZ] = {0};
+    FILE* file = fopen(filename, "r"); unless (file) return 0;
+    {
+        strings = constructEmpty_chunk(BUFSIZ);
+        atexit(free_strings);
+
+        unless (options.infiles) {
+            options.infiles = malloc(options.infiles_cap * sizeof(char*));
+            atexit(free_infiles);
+        }
+
+        while (fscanf(file, "%s", infile)) {
+            /* File name is too long! */
+            unless (infile[BUFSIZ-1] == '\0') return 0;
+
+            unless (options.infiles_count < options.infiles_cap)
+                options.infiles = realloc(options.infiles, (options.infiles_cap <<= 1) * sizeof(char const*));
+
+            options.infiles[options.infiles_count++] = add_chunk(&strings, infile, strlen(infile));
+        }
+    }
+    fclose(file);
+    return 1;
 }
 
 int main(int argc, char* argv[]) {
@@ -135,6 +186,10 @@ int main(int argc, char* argv[]) {
                             options.outfile = *(++arg);
                         }
                         break;
+                    case 'q':
+                        options.statusOutput = NULL;
+                    case 'v':
+                        options.statusOutput = stderr;
                     case '-':
                         /* Long option format */
                         dash_continues = 0;
@@ -147,14 +202,28 @@ int main(int argc, char* argv[]) {
                         } else if (str_eq_const(option, "copyright")) {
                             showCopyrightMessage();
                             return EXIT_SUCCESS;
+                        } else if (str_eq_const(option, "quiet")) {
+                            options.statusOutput = NULL;
+                        } else if (str_eq_const(option, "verbose")) {
+                            options.statusOutput = stderr;
                         } else if (str_eq_const(option, "language=")) {
                             options.language = option + sizeof("language");
                         } else if (str_eq_const(option, "output=")) {
                             options.outfile = option + sizeof("output");
+                        } else if (str_eq_const(option, "files-from=")) {
+                            unless (getInfilesFromFile((option + sizeof("files-from=")))) {
+                                fprintf(stderr, "Could NOT open '%s'\n", *arg);
+                                return EXIT_FAILURE;
+                            }
                         } else if (str_eq_const(option, "language") && arg != finalArg) {
                             options.language = *(++arg);
                         } else if (str_eq_const(option, "output") && arg != finalArg) {
                             options.outfile = *(++arg);
+                        } else if (str_eq_const(option, "files-from") && arg != finalArg) {
+                            unless (getInfilesFromFile(*(++arg))) {
+                                fprintf(stderr, "Could NOT open '%s'\n", *arg);
+                                return EXIT_FAILURE;
+                            }
                         } else {
                             fprintf(stderr, "Could NOT understand long option = %s\n", *arg);
                         }
@@ -166,6 +235,14 @@ int main(int argc, char* argv[]) {
             }
         } else {
             /* Default Argument: Input Files */
+
+            /* Cannot declare files both from argv and 'files-from' */
+            for (char** arg2 = argv + 1; arg2 <= finalArg; arg2++) {
+                unless (str_eq_const(*arg2, "–-files-from") && arg != arg2) continue;
+                showLongHelpMessage();
+                return EXIT_FAILURE;
+            }
+
             unless (options.infiles) {
                 options.infiles = malloc(options.infiles_cap * sizeof(char*));
                 atexit(free_infiles);

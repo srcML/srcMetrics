@@ -4,7 +4,7 @@ CCARGS=-std=c99 -Weverything
 CC=clang
 CFILES=src/util/*.c src/srcmetrics/*.c
 INCLUDES=-Iinclude
-LIBRARIES=-lsrcml
+LIBRARIES=-lsrcml -lsrcsax
 DEBUGFLAGS=-g
 SRCMETRICS=src/srcmetrics.c
 EXEC=bin/srcmetrics
