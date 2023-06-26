@@ -19,7 +19,7 @@
  */
 
 /**
- * @mainpage libsrcml
+ * @subpage libsrcml
  *
  * The functions in libsrcml are for the purposes of:
  *

@@ -25,6 +25,10 @@
 # Binaries
 bin/**
 
+# Doxyfiles
+html/**
+latex/**
+
 # Shared objects (inc. Windows DLLs)
 *.dll
 *.so

@@ -23,7 +23,7 @@
  *
  * The functions in srcmetrics are for the purposes of:
  *
- * * Obtaining static metrcis from the source code and its control-flow/call graphs.
+ * * Obtaining static metrics from the source code and its control-flow/call graphs.
  */
 #include <ctype.h>
 #include <stdbool.h>

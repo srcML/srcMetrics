@@ -12,7 +12,13 @@ SILENCEDWARNINGS=-Wno-poison-system-directories
 COVERAGE=${CC} ${COVARGS} ${CCARGS} ${DEBUGFLAGS} ${INCLUDES} ${LIBRARIES} ${CFILES}
 DEBUG=${CC} ${CCARGS} ${DEBUGFLAGS} ${INCLUDES} ${LIBRARIES} ${CFILES}
 
-release: bin compile
+compile: ; @\
+    ${CC} -O2 ${CCARGS} ${SILENCEDWARNINGS} ${INCLUDES} ${LIBRARIES} ${CFILES} ${SRCMETRICS} -o ${EXEC}
+
+release: clean bin compile documentation
+
+documentation: ; @\
+    doxygen
 
 coverage: clean bin; @\
     ${COVERAGE} ${SRCMETRICS} -o ${EXEC}
@@ -23,13 +29,10 @@ debug: clean bin; @\
 bin: ; @\
     mkdir bin
 
-compile: ; @\
-    ${CC} ${CCARGS} ${SILENCEDWARNINGS} ${INCLUDES} ${LIBRARIES} ${CFILES} ${SRCMETRICS} -o ${EXEC}
-
 tests: test230619
 
 test230619: clean bin; @\
     ${COVERAGE} src/tests/test230619.c -o bin/test230619.out
 
 clean: ; @\
-    rm -rf *.gcno *.gcda *.gcov bin/*
+    rm -rf *.gcno *.gcda *.gcov bin/* html latex
