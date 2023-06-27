@@ -9,9 +9,9 @@
     typedef struct OptionsBody {
         size_t infiles_count;
         size_t infiles_cap;
-        const char** infiles;
-        const char* outfile;
-        const char* language;
+        char** infiles;
+        char const* outfile;
+        char const* language;
         FILE* statusOutput;
     } Options;
 #endif

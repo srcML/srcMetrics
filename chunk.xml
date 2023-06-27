@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<unit xmlns="http://www.srcML.org/srcML/src" xmlns:cpp="http://www.srcML.org/srcML/cpp" revision="1.0.0" language="C" filename="src/util/chunk.c"><cpp:include>#<cpp:directive>include</cpp:directive> <cpp:file>&lt;stdint.h&gt;</cpp:file></cpp:include>
+<cpp:include>#<cpp:directive>include</cpp:directive> <cpp:file>&lt;stdlib.h&gt;</cpp:file></cpp:include>
+<cpp:include>#<cpp:directive>include</cpp:directive> <cpp:file>&lt;string.h&gt;</cpp:file></cpp:include>
+<cpp:include>#<cpp:directive>include</cpp:directive> <cpp:file>"util/chunk.h"</cpp:file></cpp:include>
+<cpp:include>#<cpp:directive>include</cpp:directive> <cpp:file>"util/until.h"</cpp:file></cpp:include>
+
+<comment type="block">/* Fault Case Analysis
+ * ===================
+ * initial_cap == 0
+ * malloc() fails
+ */</comment>
+<function><type><name>Chunk</name></type> <name>constructEmpty_chunk</name><parameter_list>(<parameter><decl><type><name>size_t</name> <specifier>const</specifier></type> <name>initial_cap</name></decl></parameter>)</parameter_list> <block>{<block_content>
+    <decl_stmt><decl><type><name>Chunk</name></type> <name>chunk</name></decl>;</decl_stmt>
+    <expr_stmt><expr><name><name>chunk</name><operator>.</operator><name>cap</name></name> <operator>=</operator> <name>initial_cap</name></expr>;</expr_stmt>
+    <expr_stmt><expr><operator>*</operator><operator>(</operator><name><name>chunk</name><operator>.</operator><name>end</name></name> <operator>=</operator> <name><name>chunk</name><operator>.</operator><name>start</name></name> <operator>=</operator> <call><name>malloc</name><argument_list>(<argument><expr><name>initial_cap</name></expr></argument>)</argument_list></call><operator>)</operator> <operator>=</operator> <literal type="char">'\0'</literal></expr>;</expr_stmt>
+    <return>return <expr><name>chunk</name></expr>;</return>
+</block_content>}</block></function>
+
+<comment type="block">/* Fault Case Analysis
+ * ===================
+ * chunk is invalid_ptr (e.g. NULL)
+ * append_chunk():
+ * str is invalid_ptr (e.g. NULL)
+ * chunk-&gt;start is invalid_ptr (e.g. NULL)
+ * chunk-&gt;end is invalid_ptr (e.g. NULL)
+ * chunk-&gt;end &lt; chunk-&gt;start
+ * chunk-&gt;cap == 0
+ * chunk-&gt;cap overflows
+ * realloc() fails
+ */</comment>
+<function><type><name>char</name><modifier>*</modifier></type> <name>add_chunk</name><parameter_list>(<parameter><decl><type><name>Chunk</name><modifier>*</modifier> <specifier>const</specifier> <specifier>restrict</specifier></type> <name>chunk</name></decl></parameter>, <parameter><decl><type><name>char</name> <specifier>const</specifier><modifier>*</modifier> <specifier>const</specifier> <specifier>restrict</specifier></type> <name>str</name></decl></parameter>, <parameter><decl><type><name>size_t</name> <specifier>const</specifier></type> <name>n</name></decl></parameter>)</parameter_list> <block>{<block_content>
+    <expr_stmt><expr><name><name>chunk</name><operator>-&gt;</operator><name>end</name></name> <operator>+=</operator> <operator>(</operator><name><name>chunk</name><operator>-&gt;</operator><name>end</name></name> <operator>!=</operator> <name><name>chunk</name><operator>-&gt;</operator><name>start</name></name><operator>)</operator></expr>;</expr_stmt>
+    <return>return <expr><call><name>append_chunk</name><argument_list>(<argument><expr><name>chunk</name></expr></argument>, <argument><expr><name>str</name></expr></argument>, <argument><expr><name>n</name></expr></argument>)</argument_list></call></expr>;</return>
+</block_content>}</block></function>
+
+<comment type="block">/* Fault Case Analysis
+ * ===================
+ * chunk is invalid_ptr (e.g. NULL)
+ * str is invalid_ptr (e.g. NULL)
+ * chunk-&gt;start is invalid_ptr (e.g. NULL)
+ * chunk-&gt;end is invalid_ptr (e.g. NULL)
+ * chunk-&gt;end &lt; chunk-&gt;start
+ * chunk-&gt;cap == 0
+ * chunk-&gt;cap overflows
+ * realloc() fails
+ */</comment>
+<function><type><name>char</name><modifier>*</modifier></type> <name>append_chunk</name><parameter_list>(<parameter><decl><type><name>Chunk</name><modifier>*</modifier> <specifier>const</specifier> <specifier>restrict</specifier></type> <name>chunk</name></decl></parameter>, <parameter><decl><type><name>char</name> <specifier>const</specifier><modifier>*</modifier> <specifier>const</specifier> <specifier>restrict</specifier></type> <name>str</name></decl></parameter>, <parameter><decl><type><name>size_t</name> <specifier>const</specifier></type> <name>n</name></decl></parameter>)</parameter_list> <block>{<block_content>
+    <decl_stmt><decl><type><name>char</name><modifier>*</modifier></type> <name>start</name></decl>;</decl_stmt>
+    <decl_stmt><decl><type><name>size_t</name> <specifier>const</specifier></type> <name>len</name> <init>= <expr><operator>(</operator><name>size_t</name><operator>)</operator><operator>(</operator><operator>(</operator><name>uintptr_t</name><operator>)</operator><name><name>chunk</name><operator>-&gt;</operator><name>end</name></name> <operator>-</operator> <operator>(</operator><name>uintptr_t</name><operator>)</operator><name><name>chunk</name><operator>-&gt;</operator><name>start</name></name> <operator>+</operator> <operator>(</operator><name>uintptr_t</name><operator>)</operator><name>n</name><operator>)</operator></expr></init></decl>;</decl_stmt>
+    <macro><name>until</name> <argument_list>(<argument>chunk-&gt;cap &gt; len</argument>)</argument_list></macro> <expr_stmt><expr><name><name>chunk</name><operator>-&gt;</operator><name>end</name></name> <operator>=</operator> <operator>(</operator><name><name>chunk</name><operator>-&gt;</operator><name>start</name></name> <operator>=</operator> <call><name>realloc</name><argument_list>(<argument><expr><name><name>chunk</name><operator>-&gt;</operator><name>start</name></name></expr></argument>, <argument><expr><operator>(</operator><name><name>chunk</name><operator>-&gt;</operator><name>cap</name></name> <operator>&lt;&lt;=</operator> <literal type="number">1</literal><operator>)</operator></expr></argument>)</argument_list></call><operator>)</operator> <operator>+</operator> <name>len</name> <operator>-</operator> <name>n</name></expr>;</expr_stmt>
+    <expr_stmt><expr><operator>*</operator><operator>(</operator><name><name>chunk</name><operator>-&gt;</operator><name>end</name></name> <operator>=</operator> <operator>(</operator><name>start</name> <operator>=</operator> <call><name>memcpy</name><argument_list>(<argument><expr><name><name>chunk</name><operator>-&gt;</operator><name>end</name></name></expr></argument>, <argument><expr><name>str</name></expr></argument>, <argument><expr><name>n</name></expr></argument>)</argument_list></call><operator>)</operator> <operator>+</operator> <name>n</name><operator>)</operator> <operator>=</operator> <literal type="char">'\0'</literal></expr>;</expr_stmt>
+    <return>return <expr><name>start</name></expr>;</return>
+</block_content>}</block></function>
+
+<comment type="block">/* Fault Case Analysis
+ * ===================
+ * chunk is invalid_ptr (e.g. NULL)
+ * free() fails
+ */</comment>
+<function><type><name>void</name></type> <name>free_chunk</name><parameter_list>(<parameter><decl><type><name>Chunk</name><modifier>*</modifier> <specifier>const</specifier> <specifier>restrict</specifier></type> <name>chunk</name></decl></parameter>)</parameter_list> <block>{<block_content>
+    <expr_stmt><expr><call><name>free</name><argument_list>(<argument><expr><name><name>chunk</name><operator>-&gt;</operator><name>start</name></name></expr></argument>)</argument_list></call></expr>;</expr_stmt>
+</block_content>}</block></function>
+</unit>

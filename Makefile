@@ -8,7 +8,7 @@ LIBRARIES=-lsrcml -lsrcsax
 DEBUGFLAGS=-g
 SRCMETRICS=src/srcmetrics.c
 EXEC=bin/srcmetrics
-SILENCEDWARNINGS=-Wno-poison-system-directories
+SILENCEDWARNINGS=-Wno-poison-system-directories -Wno-padded -Wno-unused-parameter
 COVERAGE=${CC} ${COVARGS} ${CCARGS} ${DEBUGFLAGS} ${INCLUDES} ${LIBRARIES} ${CFILES}
 DEBUG=${CC} ${CCARGS} ${DEBUGFLAGS} ${INCLUDES} ${LIBRARIES} ${CFILES}
 
