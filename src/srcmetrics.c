@@ -19,7 +19,7 @@
  */
 
 /**
- * @mainpage srcmetrics
+ * @mainpage srcMetrics
  *
  * The functions in srcmetrics are for the purposes of:
  *
@@ -29,20 +29,22 @@
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
+/**
+ * @defgroup SRCML_Global_Variables SRCML Global Variables
+ * @{
+ */
 extern const unsigned int SRCML_OPTION_NO_XML_DECL;
 extern const unsigned int SRCML_OPTION_POSITION;
 extern const unsigned int SRCML_OPTION_CPP;
 extern const unsigned int SRCML_OPTION_CPP_TEXT_ELSE;
 extern const unsigned int SRCML_OPTION_CPP_MARKUP_IF0;
 extern const unsigned int SRCML_OPTION_STORE_ENCODING;
-#include "libsrcml/srcml.h"
+/**@}*/
 #include "libsrcsax/srcsax.h"
 #include "libsrcsax/srcsax_handler.h"
-
 #include "srcmetrics/options.h"
 #include "srcmetrics/version.h"
 #include "util/chunk.h"
@@ -61,15 +63,47 @@ static unsigned npm = 0U;
 #define NPM_READ_SPECIFIER  4
 static unsigned npmState = NPM_NOT_A_METHOD;
 
-/* Functions called @ exit */
+/**
+ * @defgroup atexit_Functions Functions Called @ Exit
+ * @{
+ */
+
+/**
+ * @brief Puts a final newline to the standard error before termination.
+ *
+ * Putting a newline into a standard buffer may ensure a final flush in some systems.
+ * Also, it looks nice on a terminal window.
+ */
 static void putFinalNewLine(void)   { fputs("\n", stderr); }
+
+/**
+ * @brief Frees the infiles array from the options.
+ * @see Options::infiles
+ */
 static void free_infiles(void)      { free(options.infiles); }
+
+/**
+ * @brief Whatever string main() allocated, free them.
+ */
 static void free_strings(void)      { free_chunk(&strings); }
 
-/* Message functions */
+/**@}*/
+
+/**
+ * @defgroup Message_Functions Message Functions
+ * @{
+ */
+
+/**
+ * @brief Prints the copyright message.
+ */
 static void showCopyrightMessage(void) {
     fputs("Copyright (C) 2023 srcML, LLC. (www.srcML.org)\n", stderr);
 }
+
+/**
+ * @brief Prints the long help message.
+ */
 static void showLongHelpMessage(void) {
     fputs("Usage: srcmetrics [options] <src_infile>... [-o <srcMetrics_outfile>]\n", stderr);
     fputs("       srcmetrics [options] <srcML_infile>... [-o <srcMetrics_outfile>]\n", stderr);
@@ -102,6 +136,10 @@ static void showLongHelpMessage(void) {
     fputs("Contact us at www.srcml.org/support.html\n", stderr);
     fputs("www.srcML.org\n", stderr);
 }
+
+/**
+ * @brief Prints the short help message.
+ */
 static void showShortHelpMessage(void) {
     fputs("srcmetrics typically accepts input from pipe, not a terminal\n", stderr);
     fputs("Typical usage includes:\n", stderr);
@@ -114,10 +152,16 @@ static void showShortHelpMessage(void) {
     fputs("\n", stderr);
     fputs("See `srcmetrics --help` for more information\n", stderr);
 }
+
+/**
+ * @brief Prints the program and library versions.
+ */
 static void showVersion(void) {
     fputs("srcmetrics "VERSION_SRCMETRICS"\n", stderr);
     fprintf(stderr, "libsrcml %s\n", srcml_version_string()); /*, srcml_version_number());*/
 }
+
+/**@}*/
 
 static void startDocument(struct srcsax_context* context) {
     unless (context) exit(EXIT_FAILURE);
@@ -174,7 +218,11 @@ static void procInfo(struct srcsax_context* context, char const* target, char co
     unless (context) exit(EXIT_FAILURE);
 }
 
-/* Gets infiles using the file given with '--files-from' argument' */
+/**
+ * @brief Gets infiles using the file given with '--files-from' argument'
+ * @param filename The '--files-from' file name.
+ * @return 1 only if it can get the infiles from file.
+ */
 static bool getInfilesFromFile(char const* const restrict filename) {
     char infile[BUFSIZ] = {0};
     FILE* file = fopen(filename, "r"); unless (file) return 0;
@@ -189,7 +237,7 @@ static bool getInfilesFromFile(char const* const restrict filename) {
 
         while (fscanf(file, "%s", infile)) {
             /* File name is too long! */
-            unless (infile[BUFSIZ-1] == '\0') return 0;
+            unless (infile[sizeof(infile)-1] == '\0') return 0;
 
             unless (options.infiles_count < options.infiles_cap)
                 options.infiles = realloc(options.infiles, (options.infiles_cap <<= 1) * sizeof(char const*));

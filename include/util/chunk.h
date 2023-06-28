@@ -15,7 +15,7 @@
 
     /**
      * @struct Chunk
-     * A chunk of heap memory.
+     * @brief A chunk of heap memory.
      *
      * @var Chunk::cap
      *   The Chunk capacity.
