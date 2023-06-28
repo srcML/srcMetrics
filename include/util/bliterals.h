@@ -1,24 +1,94 @@
+/**
+ * @file bliterals.h
+ * @brief Defines binary literals for C.
+ *
+ * All n-bit binary literals up to n=8 have unique macro definition.
+ * Use function-like macros for n=16, n=32, and n=64.
+ * These declarations may deprecate when C23 defines built-in binary literals.
+ *
+ * @author Yavuz Koroglu
+ */
 #ifndef BLITERALS_H
     #define BLITERALS_H /* Binary Literals (may become deprecated after C23) */
     #include <stdint.h>
 
+    /**
+     * @def B_0
+     *   1'b0
+     */
     #define B_0 0x0U
+    /**
+     * @def B_1
+     *   1'b1
+     */
     #define B_1 0x1U
 
+    /**
+     * @def B_00
+     *   2'b00
+     */
     #define B_00 0x0U
+    /**
+     * @def B_01
+     *   2'b01
+     */
     #define B_01 0x1U
+    /**
+     * @def B_10
+     *   2'b10
+     */
     #define B_10 0x2U
+    /**
+     * @def B_11
+     *   2'b11
+     */
     #define B_11 0x3U
 
+    /**
+     * @def B_000
+     *   3'b000
+     */
     #define B_000 0x0U
+    /**
+     * @def B_001
+     *   3'b001
+     */
     #define B_001 0x1U
+    /**
+     * @def B_010
+     *   3'b010
+     */
     #define B_010 0x2U
+    /**
+     * @def B_011
+     *   3'b011
+     */
     #define B_011 0x3U
+    /**
+     * @def B_100
+     *   3'b100
+     */
     #define B_100 0x4U
+    /**
+     * @def B_101
+     *   3'b101
+     */
     #define B_101 0x5U
+    /**
+     * @def B_110
+     *   3'b110
+     */
     #define B_110 0x6U
+    /**
+     * @def B_111
+     *   3'b111
+     */
     #define B_111 0x7U
 
+    /**
+     * @def B_0000
+     *   4'b0000
+     */
     #define B_0000 0x0U
     #define B_0001 0x1U
     #define B_0010 0x2U
