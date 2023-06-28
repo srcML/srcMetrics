@@ -1,3 +1,13 @@
+/**
+ * @file chunk.c
+ * @brief Implements the functions defined in chunk.h
+ *
+ * This is the fastest possible Chunk implementation.
+ * This implementation disregards even the simplest
+ * NULL pointer checks, so read Fault Cases, carefully.
+ *
+ * @author Yavuz Koroglu
+ */
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,14 +29,7 @@ Chunk constructEmpty_chunk(size_t const initial_cap) {
 /* Fault Case Analysis
  * ===================
  * chunk is invalid_ptr (e.g. NULL)
- * append_chunk():
- * str is invalid_ptr (e.g. NULL)
- * chunk->start is invalid_ptr (e.g. NULL)
- * chunk->end is invalid_ptr (e.g. NULL)
- * chunk->end < chunk->start
- * chunk->cap == 0
- * chunk->cap overflows
- * realloc() fails
+ * append_chunk() fails
  */
 char* add_chunk(Chunk* const restrict chunk, char const* const restrict str, size_t const n) {
     chunk->end += (chunk->end != chunk->start);

@@ -2,5 +2,5 @@
     #define STREQ_H
     #include <string.h>
 
-    #define str_eq_const(str,conststr)   (!strncmp(str,conststr,sizeof(conststr)-1))
+    #define str_eq_const(str,strconst)   (!strncmp(str,strconst,sizeof(strconst)-1))
 #endif

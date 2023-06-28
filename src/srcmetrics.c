@@ -52,6 +52,14 @@ extern const unsigned int SRCML_OPTION_STORE_ENCODING;
 
 static Options options;
 static Chunk strings;
+static unsigned npm = 0U;
+
+#define NPM_NOT_A_METHOD    0
+#define NPM_ASSUMED_PUBLIC  1
+#define NPM_FINAL_PRIVATE   2
+#define NPM_FINAL_PUBLIC    3
+#define NPM_READ_SPECIFIER  4
+static unsigned npmState = NPM_NOT_A_METHOD;
 
 /* Functions called @ exit */
 static void putFinalNewLine(void)   { fputs("\n", stderr); }
@@ -87,7 +95,7 @@ static void showLongHelpMessage(void) {
     fputs("  -e,--exclude METRIC        Exclude this METRIC from the output\n", stderr);
     fputs("\n", stderr);
     fputs("METADATA OPTIONS:\n", stderr);
-    fputs("  -L,--list                  Output the list of supported metrics and exit\n", stderr);
+    fputs("  -L,--list-metrics          Output the list of supported metrics and exit\n", stderr);
     fputs("  -s,--show METRIC           Output detailed information on METRIC and exit\n", stderr);
     fputs("\n", stderr);
     fputs("Have a question or need to report a bug?\n", stderr);
@@ -117,31 +125,43 @@ static void startDocument(struct srcsax_context* context) {
 static void endDocument(struct srcsax_context* context) {
     unless (context) exit(EXIT_FAILURE);
 }
-static void startRoot(struct srcsax_context* context, char const* localname, char const* prefix, char const* URI, int num_namespaces, struct srcsax_namespace const* namespaces, int num_attributes, struct srcsax_attribute const* attributes) {
+static void startRoot(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri, int num_namespaces, struct srcsax_namespace const* namespaces, int num_attributes, struct srcsax_attribute const* attributes) {
     unless (context) exit(EXIT_FAILURE);
 }
-static void startUnit(struct srcsax_context* context, char const* localname, char const* prefix, char const* URI, int num_namespaces, struct srcsax_namespace const* namespaces, int num_attribute, struct srcsax_attribute const* attributes) {
+static void startUnit(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri, int num_namespaces, struct srcsax_namespace const* namespaces, int num_attribute, struct srcsax_attribute const* attributes) {
     unless (context) exit(EXIT_FAILURE);
 }
-static void startElement(struct srcsax_context* context, char const* localname, char const* prefix, char const* URI, int num_namespaces, struct srcsax_namespace const* namespaces, int num_attributes, struct srcsax_attribute const* attributes) {
+static void startElement(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri, int num_namespaces, struct srcsax_namespace const* namespaces, int num_attributes, struct srcsax_attribute const* attributes) {
+    unless (context) exit(EXIT_FAILURE);
+    switch (npmState) {
+        case NPM_NOT_A_METHOD:
+            if (str_eq_const(localname, "function")) { npmState = NPM_ASSUMED_PUBLIC; npm++; }
+            break;
+        case NPM_ASSUMED_PUBLIC:
+            if (str_eq_const(localname, "specifier")) npmState = NPM_READ_SPECIFIER;
+    }
+}
+static void endRoot(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri) {
     unless (context) exit(EXIT_FAILURE);
 }
-static void endRoot(struct srcsax_context* context, char const* localname, char const* prefix, char const* URI) {
+static void endUnit(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri) {
     unless (context) exit(EXIT_FAILURE);
 }
-static void endUnit(struct srcsax_context* context, char const* localname, char const* prefix, char const* URI) {
+static void endElement(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri) {
     unless (context) exit(EXIT_FAILURE);
-}
-static void endElement(struct srcsax_context* context, char const* localname, char const* prefix, char const* URI) {
-    unless (context) exit(EXIT_FAILURE);
+    if (str_eq_const(localname, "function")) npmState = NPM_NOT_A_METHOD;
+    else if (npmState == NPM_READ_SPECIFIER && str_eq_const(localname, "specifier")) npmState = NPM_FINAL_PUBLIC;
 }
 static void charactersRoot(struct srcsax_context* context, char const* ch, int len) {
     unless (context) exit(EXIT_FAILURE);
 }
 static void charactersUnit(struct srcsax_context* context, char const* ch, int len) {
     unless (context) exit(EXIT_FAILURE);
+    unless (npmState == NPM_READ_SPECIFIER && str_eq_const(ch, "static")) return;
+    npmState = NPM_FINAL_PRIVATE;
+    npm--;
 }
-static void metaTag(struct srcsax_context* context, char const* localname, char const* prefix, char const* URI, int num_namespaces, struct srcsax_namespace const* namespaces, int num_attributes, struct srcsax_attribute const* attributes) {
+static void metaTag(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri, int num_namespaces, struct srcsax_namespace const* namespaces, int num_attributes, struct srcsax_attribute const* attributes) {
     unless (context) exit(EXIT_FAILURE);
 }
 static void comment(struct srcsax_context* context, char const* value) {
@@ -385,6 +405,7 @@ int main(int argc, char* argv[]) {
 
             srcsax_free_context(context);
         }
+        fprintf(stderr, "\nNPM = %u\n", npm);
     }
 
     return EXIT_SUCCESS;
