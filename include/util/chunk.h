@@ -68,7 +68,6 @@
     /**
      * @brief Frees all the strings in a Chunk.
      * @param chunk The Chunk.
-     * @return void
      */
     void free_chunk(Chunk* const restrict chunk);
 #endif
