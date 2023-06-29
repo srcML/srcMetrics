@@ -1,5 +1,6 @@
 /**
  * @file srcmetrics.c
+ * @brief Implements the main() function.
  *
  * @copyright Copyright (C) 2023 srcML, LLC. (www.srcML.org)
  *
@@ -126,7 +127,7 @@ static void showLongHelpMessage(void) {
     fputs("  -e,--exclude METRIC        Exclude this METRIC from the output\n", stderr);
     fputs("\n", stderr);
     fputs("METADATA OPTIONS:\n", stderr);
-    fputs("  -L,--list-metrics          Output the list of supported metrics and exit\n", stderr);
+    fputs("  -L,--list                  Output the list of supported metrics and exit\n", stderr);
     fputs("  -s,--show METRIC           Output detailed information on METRIC and exit\n", stderr);
     fputs("\n", stderr);
     fputs("Have a question or need to report a bug?\n", stderr);
@@ -300,6 +301,8 @@ int main(int argc, char* argv[]) {
                             options.language = option;
                         } else unless (arg == finalArg) {
                             options.language = *(++arg);
+                        } else {
+                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
                         }
                         break;
                     case 'o':
@@ -308,12 +311,31 @@ int main(int argc, char* argv[]) {
                             options.outfile = option;
                         } else unless (arg == finalArg) {
                             options.outfile = *(++arg);
+                        } else {
+                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
                         }
                         break;
                     case 'q':
                         options.statusOutput = NULL;
+                        break;
                     case 'v':
                         options.statusOutput = stderr;
+                        break;
+                    case 's':
+                        dash_continues = 0;
+                        if (*(++option) == '=' && *(++option)) {
+                            fprintf(stderr, "%s: %s\n", option, descriptionOf_metric(option));
+                        } else unless (arg == finalArg) {
+                            arg++;
+                            fprintf(stderr, "%s: %s\n", *arg, descriptionOf_metric(*arg));
+                        } else {
+                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
+                            break;
+                        }
+                        return EXIT_SUCCESS;
+                    case 'L':
+                        showListOf_metrics();
+                        return EXIT_SUCCESS;
                     case '-':
                         /* Long option format */
                         dash_continues = 0;
@@ -335,10 +357,14 @@ int main(int argc, char* argv[]) {
                         } else if (str_eq_const(option, "output=")) {
                             options.outfile = option + sizeof("output");
                         } else if (str_eq_const(option, "files-from=")) {
-                            unless (getInfilesFromFile((option + sizeof("files-from=")))) {
+                            unless (getInfilesFromFile((option + sizeof("files-from")))) {
                                 fprintf(stderr, "Could NOT get infiles from '%s'\n", *arg);
                                 return EXIT_FAILURE;
                             }
+                        } else if (str_eq_const(option, "show=")) {
+                            option += sizeof("show");
+                            fprintf(stderr, "%s: %s\n", option, descriptionOf_metric(option));
+                            return EXIT_SUCCESS;
                         } else if (str_eq_const(option, "language") && arg != finalArg) {
                             options.language = *(++arg);
                         } else if (str_eq_const(option, "output") && arg != finalArg) {
@@ -348,6 +374,13 @@ int main(int argc, char* argv[]) {
                                 fprintf(stderr, "Could NOT get infiles from '%s'\n", *arg);
                                 return EXIT_FAILURE;
                             }
+                        } else if (str_eq_const(option, "show")) {
+                            arg++;
+                            fprintf(stderr, "%s: %s\n", *arg, descriptionOf_metric(*arg));
+                            return EXIT_SUCCESS;
+                        } else if (str_eq_const(option, "list")) {
+                            showListOf_metrics();
+                            return EXIT_SUCCESS;
                         } else {
                             fprintf(stderr, "Could NOT understand long option = %s\n", *arg);
                         }
