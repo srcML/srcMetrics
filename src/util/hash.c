@@ -1,6 +1,13 @@
+/**
+ * @file hash.c
+ * @brief Implements the functions defined in hash.h.
+ *
+ * The implementation follows the famous HASH33/djb2 algorithm.
+ *
+ * @see hash.h
+ * @author Yavuz Koroglu
+ */
 #include "util/hash.h"
-
-/* The famous HASH33 or djb2 algorithm */
 
 /* Fault Case Analysis
  * ==============

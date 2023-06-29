@@ -44,7 +44,6 @@ extern const unsigned int SRCML_OPTION_STORE_ENCODING;
 #include "libsrcsax/srcsax.h"
 #include "libsrcsax/srcsax_handler.h"
 #include "srcmetrics/options.h"
-#include "srcmetrics/version.h"
 #include "util/readfile.h"
 #include "util/streq.h"
 #include "util/unless.h"
@@ -217,7 +216,7 @@ static void procInfo(struct srcsax_context* context, char const* target, char co
 }
 
 /**
- * @brief Gets infiles using the file given with '--files-from' argument'
+ * @brief Gets infiles using the file given with '--files-from' argument.
  *
  * WARNING: Does NOT check if valid file name (e.g. '>' and '&' characters)!!
  *
@@ -231,6 +230,7 @@ static bool getInfilesFromFile(char const* const restrict filename) {
     {
         char* true_start = strings.start;
         while (true_start < strings.end && isspace(*true_start)) true_start++;
+        unless (true_start < strings.end) return 0;
 
         unless (options.infiles) {
             options.infiles = malloc(options.infiles_cap * sizeof(char*));
@@ -254,6 +254,12 @@ static bool getInfilesFromFile(char const* const restrict filename) {
     return 1;
 }
 
+/**
+ * @brief Parses the command-line arguments and starts the metrics collection.
+ * @param argc #arguments including the program name.
+ * @param argv The list of arguments as an array of strings.
+ * @return EXIT_FAILURE if something goes wrong, EXIT_SUCCESS otherwise.
+ */
 int main(int argc, char* argv[]) {
     char** const finalArg = argv + argc - 1;
 

@@ -1,11 +1,12 @@
 /**
- 7* @file chunk.c
+ * @file chunk.c
  * @brief Implements the functions defined in chunk.h
  *
  * This is the fastest possible Chunk implementation.
  * This implementation disregards even the simplest
  * NULL pointer checks, so read Fault Cases, carefully.
  *
+ * @see Chunk
  * @author Yavuz Koroglu
  */
 #include <stdint.h>

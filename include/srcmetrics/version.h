@@ -1,1 +1,0 @@
-#define VERSION_SRCMETRICS "0.0.1"

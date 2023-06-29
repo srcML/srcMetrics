@@ -1,5 +1,7 @@
 /**
- * @file chunk.c
+ * @file readfile.c
+ * @see readfile.h
+ * @brief Implements the functions defined in readfile.h
  */
 #include <ctype.h>
 #include <stdlib.h>
@@ -38,7 +40,10 @@ Chunk readChunk(Chunk chunk, FILE* file) {
 }
 
 Chunk readNewChunk(FILE* file) {
-    return readChunk(constructEmpty_chunk(BUFSIZ), file);
+    Chunk chunk_after;
+    Chunk chunk_before = constructEmpty_chunk(BUFSIZ);
+    unless (isValid_chunk((chunk_after = readChunk(chunk_before, file)))) { free_chunk(chunk_before); return NOT_A_CHUNK; }
+    return chunk_after;
 }
 
 Chunk open_readChunk_close(Chunk chunk, char const* const restrict filename) {
@@ -50,5 +55,8 @@ Chunk open_readChunk_close(Chunk chunk, char const* const restrict filename) {
 }
 
 Chunk open_readNewChunk_close(char const* const restrict filename) {
-    return open_readChunk_close(constructEmpty_chunk(BUFSIZ), filename);
+    Chunk chunk_after;
+    Chunk chunk_before = constructEmpty_chunk(BUFSIZ);
+    unless (isValid_chunk((chunk_after = open_readChunk_close(chunk_before, filename)))) { free_chunk(chunk_before); return NOT_A_CHUNK; }
+    return chunk_after;
 }

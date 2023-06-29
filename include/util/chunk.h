@@ -16,7 +16,7 @@
 
     /**
      * @def NOT_A_CHUNK
-     *   A special Chunk denoting a NOT-Chunk. This Chunk cannot pass IS_VALID_CHUNK(chunk) test.
+     *   A special Chunk denoting a NOT-Chunk. This Chunk cannot pass the isValid_chunk() test.
      */
     #define NOT_A_CHUNK ((Chunk){0, NULL, NULL})
 
@@ -38,9 +38,9 @@
     } Chunk;
 
     /**
-     * @brief Constructs an empty Chunk and returns it.
+     * @brief Constructs an empty Chunk.
      * @param initial_cap The initial capacity of the Chunk.
-     * @return Chunk
+     * @return Chunk.
      */
     Chunk constructEmpty_chunk(size_t const initial_cap);
 
@@ -78,5 +78,10 @@
      */
     void free_chunk(Chunk const chunk);
 
+    /**
+     * @brief Checks if a Chunk is valid.
+     * @param chunk The Chunk.
+     * @return 1 if the Chunk is valid, 0 otherwise.
+     */
     bool isValid_chunk(Chunk const chunk);
 #endif

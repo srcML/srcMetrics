@@ -1,7 +1,9 @@
-# CC=gcc-13 -std=c99 -Wall -Wextra
-COVARGS=--coverage -fprofile-arcs -ftest-coverage
-CCARGS=-std=c99 -Weverything
+# CCARGS=-std=c99 -DVERSION_SRCMETRICS=${VERSION_SRCMETRICS} -Wall -Wextra
+# CC=gcc-13
+VERSION_SRCMETRICS=0.0.1
+CCARGS=-std=c99 -DVERSION_SRCMETRICS=\"${VERSION_SRCMETRICS}\" -Weverything
 CC=clang
+COVARGS=--coverage -fprofile-arcs -ftest-coverage
 CFILES=src/util/*.c src/srcmetrics/*.c
 INCLUDES=-Iinclude
 LIBRARIES=-lsrcml -lsrcsax
