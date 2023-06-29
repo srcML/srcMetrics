@@ -16,7 +16,7 @@
      * @def OPTIONS_INITIAL
      *   Initial options are no infiles with BUFSIZ capacity, no outfile, no language, standard out, and all metrics enabled.
      */
-    #define OPTIONS_INITIAL ((Options){ 0, BUFSIZ, NULL, NULL, SRCML_LANGUAGE_NONE, stdout, ENABLE_ALL_METRICS })
+    #define OPTIONS_INITIAL ((Options){ 0, BUFSIZ, NULL, NULL, SRCML_LANGUAGE_NONE, stdout, ALL_METRICS_ENABLED })
 
     /**
      * @struct Options
@@ -33,6 +33,6 @@
         char const* outfile;
         char const* language;
         FILE* statusOutput;
-        uint64_t metrics;
+        uint_fast64_t enabledMetrics;
     } Options;
 #endif

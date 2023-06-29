@@ -19,7 +19,8 @@ Chunk readChunk(Chunk chunk, FILE* file) {
         (size = ftell(file)) > 0 &&
         fseek(file, 0, SEEK_SET) == 0
     ) return NOT_A_CHUNK;
-    len = (size_t)((chunkDiff = chunk.end - chunk.start) + size + 2);
+    if ((chunkDiff = chunk.end - chunk.start)) { chunkDiff++; chunk.end++; }
+    len = (size_t)(chunkDiff + size + 2);
     unless (len < chunk.cap) {
         chunk.cap = len + 1;
         unless (

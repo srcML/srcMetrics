@@ -51,7 +51,7 @@ extern const unsigned int SRCML_OPTION_STORE_ENCODING;
 #include "util/until.h"
 
 static Options options;
-static Chunk strings;
+static Chunk strings = NOT_A_CHUNK;
 static unsigned npm = 0U;
 
 #define NPM_NOT_A_METHOD    0
@@ -125,6 +125,8 @@ static void showLongHelpMessage(void) {
     fputs("SRCMETRICS:\n", stderr);
     fputs("  -m,--metric METRIC         Report this METRIC if possible, excludes all unspecified metrics\n", stderr);
     fputs("  -e,--exclude METRIC        Exclude this METRIC from the output\n", stderr);
+    fputs("  -f,--metrics-from FILE     Input enabled metrics from FILE\n", stderr);
+    fputs("  -x,--excluded-from FILE    Input exclided metrics from FILE\n", stderr);
     fputs("\n", stderr);
     fputs("METADATA OPTIONS:\n", stderr);
     fputs("  -L,--list                  Output the list of supported metrics and exit\n", stderr);
@@ -222,11 +224,14 @@ static void procInfo(struct srcsax_context* context, char const* target, char co
  * WARNING: Does NOT check if valid file name (e.g. '>' and '&' characters)!!
  *
  * @param filename The '--files-from' file name.
- * @return 1 only if it can get the infiles from file.
+ * @return 1 if it can get the infiles from file, 0 otherwise.
  */
 static bool getInfilesFromFile(char const* const restrict filename) {
-    unless (isValid_chunk(strings = open_readNewChunk_close(filename))) return 0;
-    atexit(free_strings);
+    unless (isValid_chunk(strings)) {
+        strings = constructEmpty_chunk(BUFSIZ);
+        atexit(free_strings);
+    }
+    unless (isValid_chunk(strings = open_readChunk_close(strings, filename))) return 0;
 
     {
         char* true_start = strings.start;
@@ -252,6 +257,64 @@ static bool getInfilesFromFile(char const* const restrict filename) {
         }
     }
 
+    return 1;
+}
+
+/**
+ * @brief Gets enabled metrics using the file given with '--metrics-from' argument.
+ *
+ * WARNING: Does NOT check if valid file name (e.g. '>' and '&' characters)!!
+ *
+ * @param filename The '--metrics-from' file name.
+ * @return 1 if it can get the metrics from file, 0 otherwise.
+ */
+static bool getEnabledMetricsFromFile(char const* const restrict filename) {
+    unless (isValid_chunk(strings)) {
+        strings = constructEmpty_chunk(BUFSIZ);
+        atexit(free_strings);
+    }
+    unless (isValid_chunk(strings = open_readChunk_close(strings, filename))) return 0;
+
+    {
+        char* true_start = strings.start;
+        while (true_start < strings.end && isspace(*true_start)) true_start++;
+        unless (true_start < strings.end) return 0;
+
+        for (char* metric = true_start; metric < strings.end;) {
+            unless (isspace(*metric))   { metric++; continue; }
+            while (isspace(*metric))    { metric++; }
+            enable_metric(&options.enabledMetrics, metric);
+        }
+    }
+    return 1;
+}
+
+/**
+ * @brief Gets excluded metrics using the file given with '--excluded-from' argument.
+ *
+ * WARNING: Does NOT check if valid file name (e.g. '>' and '&' characters)!!
+ *
+ * @param filename The '--excluded-from' file name.
+ * @return 1 if it can get the excluded from file, 0 otherwise.
+ */
+static bool getExcludedMetricsFromFile(char const* const restrict filename) {
+    unless (isValid_chunk(strings)) {
+        strings = constructEmpty_chunk(BUFSIZ);
+        atexit(free_strings);
+    }
+    unless (isValid_chunk(strings = open_readChunk_close(strings, filename))) return 0;
+
+    {
+        char* true_start = strings.start;
+        while (true_start < strings.end && isspace(*true_start)) true_start++;
+        unless (true_start < strings.end) return 0;
+
+        for (char* metric = true_start; metric < strings.end;) {
+            unless (isspace(*metric))   { metric++; continue; }
+            while (isspace(*metric))    { metric++; }
+            exclude_metric(&options.enabledMetrics, metric);
+        }
+    }
     return 1;
 }
 
@@ -336,6 +399,54 @@ int main(int argc, char* argv[]) {
                     case 'L':
                         showListOf_metrics();
                         return EXIT_SUCCESS;
+                    case 'm':
+                        dash_continues = 0;
+                        if (*(++option) == '=' && *(++option)) {
+                            unless (enable_metric(&options.enabledMetrics, option))
+                                fprintf(stderr, "Unknown Metric: %s\n", option);
+                        } else unless (arg == finalArg) {
+                            unless (enable_metric(&options.enabledMetrics, *(++arg)))
+                                fprintf(stderr, "Unknown Metric: %s\n", *arg);
+                        } else {
+                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
+                        }
+                        break;
+                    case 'e':
+                        dash_continues = 0;
+                        if (*(++option) == '=' && *(++option)) {
+                            unless (exclude_metric(&options.enabledMetrics, option))
+                                fprintf(stderr, "Unknown Metric: %s\n", option);
+                        } else unless (arg == finalArg) {
+                            unless (exclude_metric(&options.enabledMetrics, *(++arg)))
+                                fprintf(stderr, "Unknown Metric: %s\n", *arg);
+                        } else {
+                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
+                        }
+                        break;
+                    case 'f':
+                        dash_continues = 0;
+                        if (*(++option) == '=' && *(++option)) {
+                            unless (getEnabledMetricsFromFile(option))
+                                fprintf(stderr, "Could NOT get enabled metrics from '%s'\n", option);
+                        } else unless (arg == finalArg) {
+                            unless (getEnabledMetricsFromFile(*(++arg)))
+                                fprintf(stderr, "Could NOT get enabled metrics from '%s'\n", *arg);
+                        } else {
+                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
+                        }
+                        break;
+                    case 'x':
+                        dash_continues = 0;
+                        if (*(++option) == '=' && *(++option)) {
+                            unless (getExcludedMetricsFromFile(option))
+                                fprintf(stderr, "Could NOT get exclude metrics from '%s'\n", option);
+                        } else unless (arg == finalArg) {
+                            unless (getExcludedMetricsFromFile(*(++arg)))
+                                fprintf(stderr, "Could NOT get exclude metrics from '%s'\n", *arg);
+                        } else {
+                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
+                        }
+                        break;
                     case '-':
                         /* Long option format */
                         dash_continues = 0;
@@ -365,6 +476,12 @@ int main(int argc, char* argv[]) {
                             option += sizeof("show");
                             fprintf(stderr, "%s: %s\n", option, descriptionOf_metric(option));
                             return EXIT_SUCCESS;
+                        } else if (str_eq_const(option, "metric=")) {
+                            enable_metric(&options.enabledMetrics, option + sizeof("metric"));
+                        } else if (str_eq_const(option, "exclude=")) {
+                            exclude_metric(&options.enabledMetrics, option + sizeof("exclude"));
+                        } else if (str_eq_const(option, "metrics-from=")) {
+                        } else if (str_eq_const(option, "excluded-from=")) {
                         } else if (str_eq_const(option, "language") && arg != finalArg) {
                             options.language = *(++arg);
                         } else if (str_eq_const(option, "output") && arg != finalArg) {
@@ -381,6 +498,22 @@ int main(int argc, char* argv[]) {
                         } else if (str_eq_const(option, "list")) {
                             showListOf_metrics();
                             return EXIT_SUCCESS;
+                        } else if (str_eq_const(option, "metric")) {
+                            unless (enable_metric(&options.enabledMetrics, *(++arg)))
+                                fprintf(stderr, "Unknown Metric: %s\n", *arg);
+                        } else if (str_eq_const(option, "exclude")) {
+                            unless (exclude_metric(&options.enabledMetrics, *(++arg)))
+                                fprintf(stderr, "Unknown Metric: %s\n", *arg);
+                        } else if (str_eq_const(option, "metrics-from")) {
+                            unless (getEnabledMetricsFromFile(*(++arg))) {
+                                fprintf(stderr, "Could NOT get enabled metrics from '%s'\n", *arg);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (str_eq_const(option, "excluded-from")) {
+                            unless (getExcludedMetricsFromFile(*(++arg))) {
+                                fprintf(stderr, "Could NOT get excluded metrics from '%s'\n", *arg);
+                                return EXIT_FAILURE;
+                            }
                         } else {
                             fprintf(stderr, "Could NOT understand long option = %s\n", *arg);
                         }
