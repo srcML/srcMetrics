@@ -11,7 +11,14 @@
  */
 #ifndef CHUNK_H
     #define CHUNK_H
+    #include <stdbool.h>
     #include <stddef.h>
+
+    /**
+     * @def NOT_A_CHUNK
+     *   A special Chunk denoting a NOT-Chunk. This Chunk cannot pass IS_VALID_CHUNK(chunk) test.
+     */
+    #define NOT_A_CHUNK ((Chunk){0, NULL, NULL})
 
     /**
      * @struct Chunk
@@ -69,5 +76,7 @@
      * @brief Frees all the strings in a Chunk.
      * @param chunk The Chunk.
      */
-    void free_chunk(Chunk* const restrict chunk);
+    void free_chunk(Chunk const chunk);
+
+    bool isValid_chunk(Chunk const chunk);
 #endif

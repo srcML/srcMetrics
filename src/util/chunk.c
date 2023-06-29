@@ -1,5 +1,5 @@
 /**
- * @file chunk.c
+ 7* @file chunk.c
  * @brief Implements the functions defined in chunk.h
  *
  * This is the fastest possible Chunk implementation.
@@ -12,17 +12,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include "util/chunk.h"
+#include "util/unless.h"
 #include "util/until.h"
 
 /* Fault Case Analysis
  * ===================
  * initial_cap == 0
- * malloc() fails
  */
 Chunk constructEmpty_chunk(size_t const initial_cap) {
     Chunk chunk;
     chunk.cap = initial_cap;
-    *(chunk.end = chunk.start = malloc(initial_cap)) = '\0';
+    unless ((chunk.end = chunk.start = malloc(initial_cap))) return NOT_A_CHUNK;
+    *(chunk.end) = '\0';
     return chunk;
 }
 
@@ -57,9 +58,15 @@ char* append_chunk(Chunk* const restrict chunk, char const* const restrict str, 
 
 /* Fault Case Analysis
  * ===================
- * chunk is invalid_ptr (e.g. NULL)
  * free() fails
  */
-void free_chunk(Chunk* const restrict chunk) {
-    free(chunk->start);
+void free_chunk(Chunk const chunk) {
+    free(chunk.start);
+}
+
+/* Fault Case Analysis
+ * ===================
+ */
+bool isValid_chunk(Chunk const chunk) {
+    return chunk.start && chunk.end && chunk.end >= chunk.start && chunk.cap > (size_t)(chunk.end - chunk.start);
 }

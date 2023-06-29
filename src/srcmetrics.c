@@ -28,8 +28,6 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <stdbool.h>
-#include <stdint.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 /**
@@ -47,7 +45,7 @@ extern const unsigned int SRCML_OPTION_STORE_ENCODING;
 #include "libsrcsax/srcsax_handler.h"
 #include "srcmetrics/options.h"
 #include "srcmetrics/version.h"
-#include "util/chunk.h"
+#include "util/readfile.h"
 #include "util/streq.h"
 #include "util/unless.h"
 #include "util/until.h"
@@ -85,7 +83,7 @@ static void free_infiles(void)      { free(options.infiles); }
 /**
  * @brief Whatever string main() allocated, free them.
  */
-static void free_strings(void)      { free_chunk(&strings); }
+static void free_strings(void)      { free_chunk(strings); }
 
 /**@}*/
 
@@ -220,32 +218,39 @@ static void procInfo(struct srcsax_context* context, char const* target, char co
 
 /**
  * @brief Gets infiles using the file given with '--files-from' argument'
+ *
+ * WARNING: Does NOT check if valid file name (e.g. '>' and '&' characters)!!
+ *
  * @param filename The '--files-from' file name.
  * @return 1 only if it can get the infiles from file.
  */
 static bool getInfilesFromFile(char const* const restrict filename) {
-    char infile[BUFSIZ] = {0};
-    FILE* file = fopen(filename, "r"); unless (file) return 0;
+    unless (isValid_chunk(strings = open_readNewChunk_close(filename))) return 0;
+    atexit(free_strings);
+
     {
-        strings = constructEmpty_chunk(BUFSIZ);
-        atexit(free_strings);
+        char* true_start = strings.start;
+        while (true_start < strings.end && isspace(*true_start)) true_start++;
 
         unless (options.infiles) {
             options.infiles = malloc(options.infiles_cap * sizeof(char*));
             atexit(free_infiles);
         }
 
-        while (fscanf(file, "%s", infile)) {
-            /* File name is too long! */
-            unless (infile[sizeof(infile)-1] == '\0') return 0;
-
-            unless (options.infiles_count < options.infiles_cap)
-                options.infiles = realloc(options.infiles, (options.infiles_cap <<= 1) * sizeof(char const*));
-
-            options.infiles[options.infiles_count++] = add_chunk(&strings, infile, strlen(infile));
+        options.infiles[options.infiles_count++] = true_start;
+        for (char* ptr = true_start; ptr < strings.end;) {
+            unless (isspace(*ptr))  { ptr++; continue; }
+            while (isspace(*ptr))   { *(ptr++) = '\0'; }
+            unless (options.infiles_count < options.infiles_cap) {
+                unless (
+                    (options.infiles_cap <<= 1) > options.infiles_count &&
+                    (options.infiles = realloc(options.infiles, options.infiles_cap * sizeof(char*)))
+                ) return 0;
+            }
+            options.infiles[options.infiles_count++] = ptr;
         }
     }
-    fclose(file);
+
     return 1;
 }
 
