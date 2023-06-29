@@ -330,7 +330,7 @@ int main(int argc, char* argv[]) {
                             options.outfile = option + sizeof("output");
                         } else if (str_eq_const(option, "files-from=")) {
                             unless (getInfilesFromFile((option + sizeof("files-from=")))) {
-                                fprintf(stderr, "Could NOT open '%s'\n", *arg);
+                                fprintf(stderr, "Could NOT get infiles from '%s'\n", *arg);
                                 return EXIT_FAILURE;
                             }
                         } else if (str_eq_const(option, "language") && arg != finalArg) {
@@ -339,7 +339,7 @@ int main(int argc, char* argv[]) {
                             options.outfile = *(++arg);
                         } else if (str_eq_const(option, "files-from") && arg != finalArg) {
                             unless (getInfilesFromFile(*(++arg))) {
-                                fprintf(stderr, "Could NOT open '%s'\n", *arg);
+                                fprintf(stderr, "Could NOT get infiles from '%s'\n", *arg);
                                 return EXIT_FAILURE;
                             }
                         } else {
@@ -367,7 +367,10 @@ int main(int argc, char* argv[]) {
             }
 
             unless (options.infiles_count < options.infiles_cap) {
-                options.infiles = realloc(options.infiles, (options.infiles_cap <<= 1) * sizeof(char const*));
+                unless (
+                    (options.infiles_cap <<= 1) > options.infiles_count &&
+                    (options.infiles = realloc(options.infiles, options.infiles_cap * sizeof(char*)))
+                ) { fputs("Could NOT get infiles\n", stderr); return EXIT_FAILURE; };
             }
 
             options.infiles[options.infiles_count++] = *arg;
