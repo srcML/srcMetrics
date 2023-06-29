@@ -31,7 +31,7 @@
      *   concatenates them to obtain a 32-bit
      *   binary literal.
      */
-    #define B4(hh,h,l,ll)                       (((uint_fast32_t)B2(hh,h) << 16U) | B2(l,ll))
+    #define B4(hh,h,l,ll)                       (((uint_fast32_t)B2(hh,h) << 16U) | (uint_fast32_t)B2(l,ll))
 
     /**
      * @def B8(hhhh,hhh,hh,h,l,ll,lll,llll)
@@ -39,7 +39,7 @@
      *   concatenates them to obtain a 64-bit
      *   binary literal.
      */
-    #define B8(hhhh,hhh,hh,h,l,ll,lll,llll)     (((uint_fast64_t)B4(hhhh,hhh,hh,h) << 32U) | B4(l,ll,lll,llll))
+    #define B8(hhhh,hhh,hh,h,l,ll,lll,llll)     (((uint_fast64_t)B4(hhhh,hhh,hh,h) << 32U) | (uint_fast64_t)B4(l,ll,lll,llll))
 
     /**
      * @def B_0

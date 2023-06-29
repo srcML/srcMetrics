@@ -10,12 +10,13 @@
     #include <stddef.h>
     #include <stdio.h>
     #include "libsrcml/srcml.h"
+    #include "srcmetrics/metrics.h"
 
     /**
      * @def OPTIONS_INITIAL
-     *   Initial options are no infiles with BUFSIZ capacity, no outfile, no language, and standard out
+     *   Initial options are no infiles with BUFSIZ capacity, no outfile, no language, standard out, and all metrics enabled.
      */
-    #define OPTIONS_INITIAL ((Options){ 0, BUFSIZ, NULL, NULL, SRCML_LANGUAGE_NONE, stdout })
+    #define OPTIONS_INITIAL ((Options){ 0, BUFSIZ, NULL, NULL, SRCML_LANGUAGE_NONE, stdout, ENABLE_ALL_METRICS })
 
     /**
      * @struct Options
@@ -32,5 +33,6 @@
         char const* outfile;
         char const* language;
         FILE* statusOutput;
+        uint64_t metrics;
     } Options;
 #endif
