@@ -15,5 +15,5 @@
      *   Repeats the following code block or statement n times
      *   using an internal down counter called _dcntr.
      */
-    #define repeat(n) for (register unsigned long long _dcntr = (unsigned long long)(n); _dcntr--;)
+    #define repeat(n) for (unsigned long long _dcntr = (unsigned long long)(n); _dcntr--;)
 #endif
