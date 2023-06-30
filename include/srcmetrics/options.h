@@ -6,7 +6,6 @@
  */
 #ifndef OPTIONS_H
     #define OPTIONS_H
-    #include <stdbool.h>
     #include <stddef.h>
     #include <stdint.h>
     #include <stdio.h>
@@ -36,5 +35,5 @@
      * @def OPTIONS_INITIAL
      *   Initial options are no infiles with BUFSIZ capacity, no outfile, no language, standard out, and all metrics enabled.
      */
-    #define OPTIONS_INITIAL ((struct Options){ 0, BUFSIZ, NULL, NULL, NULL, stdout, ALL_METRICS_ENABLED })
+    #define OPTIONS_INITIAL ((struct Options){ 0, BUFSIZ, NULL, NULL, SRCML_LANGUAGE_NONE, stdout, ALL_METRICS_ENABLED })
 #endif

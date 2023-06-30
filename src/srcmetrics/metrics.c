@@ -9,6 +9,7 @@
 
 #include "srcmetrics/metrics.h"
 #include "srcmetrics/options.h"
+#include "util/chunk.h"
 #include "util/unless.h"
 
 static char const* metrics[] = METRICS;
@@ -51,3 +52,75 @@ bool enableOrExclude_metric(char const* const restrict abbreviation, bool const 
     }
     return 1;
 }
+
+static Chunk chunk;
+
+static char const* currentDocument = NULL;
+static char const* currentUnit     = NULL;
+static char const* currentFunction = NULL;
+
+static void event_startDocument(struct srcsax_context* context);
+static void event_endDocument(struct srcsax_context* context);
+static void event_startRoot(
+    struct srcsax_context*          context,
+    char const*                     localname,
+    char const*                     prefix,
+    char const*                     uri,
+    int                             num_namespaces,
+    struct srcsax_namespace const*  namespaces,
+    int                             num_attributes,
+    struct srcsax_attribute const*  attributes
+);
+static void event_startUnit(
+    struct srcsax_context*          context,
+    char const*                     localname,
+    char const*                     prefix,
+    char const*                     uri,
+    int                             num_namespaces,
+    struct srcsax_namespace const*  namespaces,
+    int                             num_attribute,
+    struct srcsax_attribute const*  attributes
+);
+static void event_startElement(
+    struct srcsax_context*          context,
+    char const*                     localname,
+    char const*                     prefix,
+    char const*                     uri,
+    int                             num_namespaces,
+    struct srcsax_namespace const*  namespaces,
+    int                             num_attributes,
+    struct srcsax_attribute const*  attributes
+);
+static void event_endRoot(
+    struct srcsax_context*          context,
+    char const*                     localname,
+    char const*                     prefix,
+    char const*                     uri
+);
+static void event_endUnit(
+    struct srcsax_context*          context,
+    char const*                     localname,
+    char const*                     prefix,
+    char const*                     uri
+);
+static void event_endElement(
+    struct srcsax_context*          context,
+    char const*                     localname,
+    char const*                     prefix,
+    char const*                     uri
+);
+static void event_charactersRoot(struct srcsax_context* context, char const* ch, int len);
+static void event_charactersUnit(struct srcsax_context* context, char const* ch, int len);
+static void event_metaTag(
+    struct srcsax_context*          context,
+    char const*                     localname,
+    char const*                     prefix,
+    char const*                     uri,
+    int                             num_namespaces,
+    struct srcsax_namespace const*  namespaces,
+    int                             num_attributes,
+    struct srcsax_attribute const*  attributes
+);
+static void event_comment(struct srcsax_context* context, char const* value);
+static void event_cdataBlock(struct srcsax_context * context, char const* value, int len);
+static void event_procInfo(struct srcsax_context* context, char const* target, char const* data);
