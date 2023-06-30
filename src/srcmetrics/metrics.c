@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "srcmetrics/metrics.h"
+#include "srcmetrics/options.h"
 #include "util/unless.h"
 
 static char const* metrics[] = METRICS;
@@ -39,17 +40,14 @@ bool isValidIndex_metric(size_t const metricId) {
     return metricId < (sizeof(metrics) / sizeof(char const*));
 }
 
-bool enable_metric(uint_fast64_t* const restrict enabledMetrics, char const* const restrict abbreviation) {
+bool enableOrExclude_metric(char const* const restrict abbreviation, bool const enable) {
     uint_fast64_t const metricId = indexOf_metric(abbreviation);
     unless (isValidIndex_metric(metricId)) return 0;
-    if (*enabledMetrics == ALL_METRICS_ENABLED) *enabledMetrics = 0;
-    *enabledMetrics |= ((uint_fast64_t)1 << metricId);
-    return 1;
-}
-
-bool exclude_metric(uint_fast64_t* const restrict enabledMetrics, char const* const restrict abbreviation) {
-    uint_fast64_t const metricId = indexOf_metric(abbreviation);
-    unless (isValidIndex_metric(metricId)) return 0;
-    *enabledMetrics &= ~((uint_fast64_t)1 << metricId);
+    if (enable) {
+        if (options.enabledMetrics == ALL_METRICS_ENABLED) options.enabledMetrics = 0;
+        options.enabledMetrics |= ((uint_fast64_t)1 << metricId);
+    } else {
+        options.enabledMetrics &= ~((uint_fast64_t)1 << metricId);
+    }
     return 1;
 }

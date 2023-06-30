@@ -29,28 +29,23 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <unistd.h>
 
-/**
- * @defgroup SRCML_Global_Variables SRCML Global Variables
- * @{
- */
-extern const unsigned int SRCML_OPTION_NO_XML_DECL;
-extern const unsigned int SRCML_OPTION_POSITION;
-extern const unsigned int SRCML_OPTION_CPP;
-extern const unsigned int SRCML_OPTION_CPP_TEXT_ELSE;
-extern const unsigned int SRCML_OPTION_CPP_MARKUP_IF0;
-extern const unsigned int SRCML_OPTION_STORE_ENCODING;
-/**@}*/
-#include "libsrcsax/srcsax.h"
-#include "libsrcsax/srcsax_handler.h"
+#include "libsrcml/srcml.h"
+#include "srcmetrics/metrics.h"
 #include "srcmetrics/options.h"
+#include "util/csv.h"
 #include "util/readfile.h"
 #include "util/streq.h"
 #include "util/unless.h"
 #include "util/until.h"
 
-static Options options;
+char const* csv_delimeter = CSV_INITIAL_DELIMETER;
+char const* csv_row_end = CSV_INITIAL_ROW_END;
+
+struct Options options;
+
 static Chunk strings = NOT_A_CHUNK;
 static unsigned npm = 0U;
 
@@ -119,6 +114,7 @@ static void showLongHelpMessage(void) {
     fputs("  -q,--quiet                 Suppress status messages\n", stderr);
     fputs("  -o,--output FILE           Write output to FILE\n", stderr);
     fputs("  -l,--language LANG         Set the source-code language to C\n", stderr);
+    fputs("  -d,--delimeter DELIM       Change the CSV delimeter, default: ','\n", stderr);
     fputs("  --files-from FILE          Input source-code filenames from FILE instead of command-line arguments\n", stderr);
     /*fputs("  --src-encoding ENCODING    Set the input source-code encoding\n", stderr);*/
     fputs("\n", stderr);
@@ -261,14 +257,15 @@ static bool getInfilesFromFile(char const* const restrict filename) {
 }
 
 /**
- * @brief Gets enabled metrics using the file given with '--metrics-from' argument.
+ * @brief Gets enabled or excluded metrics using the file given with '--metrics-from' argument.
  *
  * WARNING: Does NOT check if valid file name (e.g. '>' and '&' characters)!!
  *
  * @param filename The '--metrics-from' file name.
+ * @param enable Enable metrics if 1, exclude otherwise.
  * @return 1 if it can get the metrics from file, 0 otherwise.
  */
-static bool getEnabledMetricsFromFile(char const* const restrict filename) {
+static bool getEnabledOrExcludedMetricsFromFile(char const* const restrict filename, bool const enable) {
     unless (isValid_chunk(strings)) {
         strings = constructEmpty_chunk(BUFSIZ);
         atexit(free_strings);
@@ -283,36 +280,7 @@ static bool getEnabledMetricsFromFile(char const* const restrict filename) {
         for (char* metric = true_start; metric < strings.end;) {
             unless (isspace(*metric))   { metric++; continue; }
             while (isspace(*metric))    { metric++; }
-            enable_metric(&options.enabledMetrics, metric);
-        }
-    }
-    return 1;
-}
-
-/**
- * @brief Gets excluded metrics using the file given with '--excluded-from' argument.
- *
- * WARNING: Does NOT check if valid file name (e.g. '>' and '&' characters)!!
- *
- * @param filename The '--excluded-from' file name.
- * @return 1 if it can get the excluded from file, 0 otherwise.
- */
-static bool getExcludedMetricsFromFile(char const* const restrict filename) {
-    unless (isValid_chunk(strings)) {
-        strings = constructEmpty_chunk(BUFSIZ);
-        atexit(free_strings);
-    }
-    unless (isValid_chunk(strings = open_readChunk_close(strings, filename))) return 0;
-
-    {
-        char* true_start = strings.start;
-        while (true_start < strings.end && isspace(*true_start)) true_start++;
-        unless (true_start < strings.end) return 0;
-
-        for (char* metric = true_start; metric < strings.end;) {
-            unless (isspace(*metric))   { metric++; continue; }
-            while (isspace(*metric))    { metric++; }
-            exclude_metric(&options.enabledMetrics, metric);
+            enableOrExclude_metric(metric, enable);
         }
     }
     return 1;
@@ -365,7 +333,7 @@ int main(int argc, char* argv[]) {
                         } else unless (arg == finalArg) {
                             options.language = *(++arg);
                         } else {
-                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
+                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
                         }
                         break;
                     case 'o':
@@ -375,7 +343,7 @@ int main(int argc, char* argv[]) {
                         } else unless (arg == finalArg) {
                             options.outfile = *(++arg);
                         } else {
-                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
+                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
                         }
                         break;
                     case 'q':
@@ -392,7 +360,7 @@ int main(int argc, char* argv[]) {
                             arg++;
                             fprintf(stderr, "%s: %s\n", *arg, descriptionOf_metric(*arg));
                         } else {
-                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
+                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
                             break;
                         }
                         return EXIT_SUCCESS;
@@ -402,50 +370,59 @@ int main(int argc, char* argv[]) {
                     case 'm':
                         dash_continues = 0;
                         if (*(++option) == '=' && *(++option)) {
-                            unless (enable_metric(&options.enabledMetrics, option))
+                            unless (enableOrExclude_metric(option, 1))
                                 fprintf(stderr, "Unknown Metric: %s\n", option);
                         } else unless (arg == finalArg) {
-                            unless (enable_metric(&options.enabledMetrics, *(++arg)))
+                            unless (enableOrExclude_metric(*(++arg), 1))
                                 fprintf(stderr, "Unknown Metric: %s\n", *arg);
                         } else {
-                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
+                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
                         }
                         break;
                     case 'e':
                         dash_continues = 0;
                         if (*(++option) == '=' && *(++option)) {
-                            unless (exclude_metric(&options.enabledMetrics, option))
+                            unless (enableOrExclude_metric(option, 0))
                                 fprintf(stderr, "Unknown Metric: %s\n", option);
                         } else unless (arg == finalArg) {
-                            unless (exclude_metric(&options.enabledMetrics, *(++arg)))
+                            unless (enableOrExclude_metric(*(++arg), 0))
                                 fprintf(stderr, "Unknown Metric: %s\n", *arg);
                         } else {
-                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
+                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
                         }
                         break;
                     case 'f':
                         dash_continues = 0;
                         if (*(++option) == '=' && *(++option)) {
-                            unless (getEnabledMetricsFromFile(option))
+                            unless (getEnabledOrExcludedMetricsFromFile(option, 1))
                                 fprintf(stderr, "Could NOT get enabled metrics from '%s'\n", option);
                         } else unless (arg == finalArg) {
-                            unless (getEnabledMetricsFromFile(*(++arg)))
+                            unless (getEnabledOrExcludedMetricsFromFile(*(++arg), 1))
                                 fprintf(stderr, "Could NOT get enabled metrics from '%s'\n", *arg);
                         } else {
-                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
+                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
                         }
                         break;
                     case 'x':
                         dash_continues = 0;
                         if (*(++option) == '=' && *(++option)) {
-                            unless (getExcludedMetricsFromFile(option))
+                            unless (getEnabledOrExcludedMetricsFromFile(option, 0))
                                 fprintf(stderr, "Could NOT get exclude metrics from '%s'\n", option);
                         } else unless (arg == finalArg) {
-                            unless (getExcludedMetricsFromFile(*(++arg)))
+                            unless (getEnabledOrExcludedMetricsFromFile(*(++arg), 0))
                                 fprintf(stderr, "Could NOT get exclude metrics from '%s'\n", *arg);
                         } else {
-                            fprintf(stderr, "There cannot be more flags '%c' in argument = %s\n", *(--option), *arg);
+                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
                         }
+                        break;
+                    case 'd':
+                        dash_continues = 0;
+                        if (*(++option) == '=' && *(++option))
+                            csv_delimeter = option;
+                        else unless (arg == finalArg)
+                            csv_delimeter = *(++arg);
+                        else
+                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
                         break;
                     case '-':
                         /* Long option format */
@@ -477,11 +454,21 @@ int main(int argc, char* argv[]) {
                             fprintf(stderr, "%s: %s\n", option, descriptionOf_metric(option));
                             return EXIT_SUCCESS;
                         } else if (str_eq_const(option, "metric=")) {
-                            enable_metric(&options.enabledMetrics, option + sizeof("metric"));
+                            enableOrExclude_metric(option + sizeof("metric"), 1);
                         } else if (str_eq_const(option, "exclude=")) {
-                            exclude_metric(&options.enabledMetrics, option + sizeof("exclude"));
+                            enableOrExclude_metric(option + sizeof("exclude"), 0);
                         } else if (str_eq_const(option, "metrics-from=")) {
+                            unless (getEnabledOrExcludedMetricsFromFile(option + sizeof("metrics-from"), 1)) {
+                                fprintf(stderr, "Could NOT get enabled metrics from '%s'\n", *arg);
+                                return EXIT_FAILURE;
+                            }
                         } else if (str_eq_const(option, "excluded-from=")) {
+                            unless (getEnabledOrExcludedMetricsFromFile(option + sizeof("exclude-from"), 0)) {
+                                fprintf(stderr, "Could NOT get enabled metrics from '%s'\n", *arg);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (str_eq_const(option, "delimeter=")) {
+                            csv_delimeter = option + sizeof("delimeter");
                         } else if (str_eq_const(option, "language") && arg != finalArg) {
                             options.language = *(++arg);
                         } else if (str_eq_const(option, "output") && arg != finalArg) {
@@ -499,21 +486,23 @@ int main(int argc, char* argv[]) {
                             showListOf_metrics();
                             return EXIT_SUCCESS;
                         } else if (str_eq_const(option, "metric")) {
-                            unless (enable_metric(&options.enabledMetrics, *(++arg)))
+                            unless (enableOrExclude_metric(*(++arg), 1))
                                 fprintf(stderr, "Unknown Metric: %s\n", *arg);
                         } else if (str_eq_const(option, "exclude")) {
-                            unless (exclude_metric(&options.enabledMetrics, *(++arg)))
+                            unless (enableOrExclude_metric(*(++arg), 0))
                                 fprintf(stderr, "Unknown Metric: %s\n", *arg);
                         } else if (str_eq_const(option, "metrics-from")) {
-                            unless (getEnabledMetricsFromFile(*(++arg))) {
+                            unless (getEnabledOrExcludedMetricsFromFile(*(++arg), 1)) {
                                 fprintf(stderr, "Could NOT get enabled metrics from '%s'\n", *arg);
                                 return EXIT_FAILURE;
                             }
                         } else if (str_eq_const(option, "excluded-from")) {
-                            unless (getExcludedMetricsFromFile(*(++arg))) {
+                            unless (getEnabledOrExcludedMetricsFromFile(*(++arg), 0)) {
                                 fprintf(stderr, "Could NOT get excluded metrics from '%s'\n", *arg);
                                 return EXIT_FAILURE;
                             }
+                        } else if (str_eq_const(option, "delimeter") && arg != finalArg) {
+                            csv_delimeter = *(++arg);
                         } else {
                             fprintf(stderr, "Could NOT understand long option = %s\n", *arg);
                         }

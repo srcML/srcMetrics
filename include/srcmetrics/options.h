@@ -8,25 +8,19 @@
     #define OPTIONS_H
     #include <stdbool.h>
     #include <stddef.h>
+    #include <stdint.h>
     #include <stdio.h>
-    #include "libsrcml/srcml.h"
-    #include "srcmetrics/metrics.h"
-
-    /**
-     * @def OPTIONS_INITIAL
-     *   Initial options are no infiles with BUFSIZ capacity, no outfile, no language, standard out, and all metrics enabled.
-     */
-    #define OPTIONS_INITIAL ((Options){ 0, BUFSIZ, NULL, NULL, SRCML_LANGUAGE_NONE, stdout, ALL_METRICS_ENABLED })
+    #include "util/bliterals.h"
 
     /**
      * @struct Options
-     * @brief srcMetrics Options.
+     * @brief Global srcMetrics Options.
      *
      * Command-line parameters usually interact with these options.
      *
-     * @see main()
+     * @see srcmetrics.c
      */
-    typedef struct OptionsBody {
+    extern struct Options {
         size_t infiles_count;
         size_t infiles_cap;
         char** infiles;
@@ -34,5 +28,13 @@
         char const* language;
         FILE* statusOutput;
         uint_fast64_t enabledMetrics;
-    } Options;
+    } options;
+
+    #define ALL_METRICS_ENABLED B8(B_11111111,B_11111111,B_11111111,B_11111111,B_11111111,B_11111111,B_11111111,B_11111111)
+
+    /**
+     * @def OPTIONS_INITIAL
+     *   Initial options are no infiles with BUFSIZ capacity, no outfile, no language, standard out, and all metrics enabled.
+     */
+    #define OPTIONS_INITIAL ((struct Options){ 0, BUFSIZ, NULL, NULL, NULL, stdout, ALL_METRICS_ENABLED })
 #endif
