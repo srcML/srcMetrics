@@ -8,6 +8,9 @@
     #define EVENT_H
     #include "libsrcsax/srcsax.h"
 
+    #include "srcmetrics/metrics/npm.h"
+    #include "srcmetrics/metrics/sloc.h"
+
     typedef void(*Event)(struct srcsax_context*, ...);
 
     /**

@@ -6,9 +6,12 @@
  */
 #ifndef REPORT_H
     #define REPORT_H
-    #include <stdio.h>
+    #include "util/svmap.h"
 
-    typedef void(*Report)(FILE* output);
+    #include "srcmetrics/metrics/npm.h"
+    #include "srcmetrics/metrics/sloc.h"
+
+    typedef SVMap*(*Report)(void);
 
     /**
      * @brief Calls all enabled metric Report functions.

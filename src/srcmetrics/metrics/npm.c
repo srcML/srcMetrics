@@ -8,16 +8,16 @@
 #include <stdlib.h>
 #include "srcmetrics/metrics/npm.h"
 #include "util/chunk.h"
-#include "util/csv.h"
 #include "util/repeat.h"
-#include "util/svmap.h"
+#include "util/streq.h"
+#include "util/unless.h"
 
 extern Chunk    strings;
 static int      npm_read_state = 0;
 static SVMap    npm_statistics = NOT_AN_SVMAP;
 
-static unsigned npm_overall;
-static unsigned npm_currentUnit;
+static double   npm_overall;
+static double   npm_currentUnit;
 
 void event_startDocument_npm(struct srcsax_context* context, ...) {
     unless (
@@ -26,6 +26,12 @@ void event_startDocument_npm(struct srcsax_context* context, ...) {
     ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
 
     npm_overall = 0;
+}
+
+void event_endDocument_npm(struct srcsax_context* context, ...) {
+    unless (insert_svmap(&npm_statistics, "NPM", (value_t){ .as_double = npm_overall })) {
+        fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE);
+    }
 }
 
 void event_startUnit_npm(struct srcsax_context* context, ...) {
@@ -44,25 +50,57 @@ void event_endUnit_npm(struct srcsax_context* context, ...) {
     va_end(args);
 
     unless (
-        (npmKey = add_chunk(&strings, "NPM_"))                  &&
-        append_chunk(&strings, currentUnit)                     &&
-        insert_svmap(&npm_statistics, npmKey, npm_currentUnit)
+        (npmKey = add_chunk(&strings, "NPM_"))  &&
+        append_chunk(&strings, currentUnit)     &&
+        insert_svmap(&npm_statistics, npmKey, (value_t){ .as_double = npm_currentUnit })
     ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
 }
 
 void event_startElement_npm(struct srcsax_context* context, ...) {
+    char const* localname;
+    va_list args;
 
+    va_start(args, context);
+    localname = va_arg(args, char const*);
+    va_end(args);
+
+    if (str_eq_const(localname, "function")) {
+        npm_read_state = 1;
+        npm_overall++;
+        npm_currentUnit++;
+    } else if (str_eq_const(localname, "type")) {
+        npm_read_state = 2;
+    } else if (str_eq_const(localname, "specifier")) {
+        npm_read_state = 3;
+    }
 }
 
 void event_endElement_npm(struct srcsax_context* context, ...) {
-
+    switch (npm_read_state) {
+        case 2:
+            if (str_eq_const(localname, "type")) npm_read_state = 0;
+            break;
+        case 3:
+            if (str_eq_const(localname, "specifier")) npm_read_state = 0;
+            break;
+        default:
+            if (str_eq_const(localname, "function")) npm_read_state = 0;
+    }
 }
 
 void event_charactersUnit_npm(struct srcsax_context* context, ...) {
+    char const* ch;
+    va_list args;
 
+    va_start(args, context);
+    ch = va_arg(args, char const*);
+    va_end(args);
+
+    if (npm_read_state == 3 && str_eq_const(ch, "static")) {
+        npm_read_state = 0;
+        npm_overall--;
+        npm_currentUnit--;
+    }
 }
 
-void report_npm(FILE* output) {
-    for (SVPair* pair = npm_statistics.pairs; pair < npm_statistics.size; pair++)
-        fprintf(output, "%s%s%s%s", pair->key, csv_delimeter, pair->value, csv_row_end);
-}
+SVMap* report_npm(void) { return isValid_svmap(npm_statistics) ? &npm_statistics : NULL; }
