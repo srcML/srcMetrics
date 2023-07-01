@@ -10,6 +10,7 @@
 
     #define NOT_A_METRIC_ID             ALL_METRICS_ENABLED
     #define DESCRIPTION_OF_NOT_A_METRIC "Unknown Metric"
+    #define METRICS_COUNT_MAX           64
 
     #define METRICS {                   \
         "NPM",                          \

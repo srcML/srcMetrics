@@ -81,7 +81,7 @@
      * @param map The SVMap.
      * @param key The key string.
      * @param value The value.
-     * @return The inserted SVPair.
+     * @return NULL if insertion went wrong, a pointer to the inserted SVPair otherwise.
      */
     SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, value_t const value);
 

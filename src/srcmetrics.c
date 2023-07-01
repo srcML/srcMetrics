@@ -41,12 +41,11 @@
 #include "util/unless.h"
 #include "util/until.h"
 
-char const* csv_delimeter = CSV_INITIAL_DELIMETER;
-char const* csv_row_end = CSV_INITIAL_ROW_END;
-
+char const* csv_delimeter   = CSV_INITIAL_DELIMETER;
+char const* csv_row_end     = CSV_INITIAL_ROW_END;
+Chunk strings               = NOT_A_CHUNK;
 struct Options options;
 
-static Chunk strings = NOT_A_CHUNK;
 static unsigned npm = 0U;
 
 #define NPM_NOT_A_METHOD    0
@@ -517,7 +516,7 @@ int main(int argc, char* argv[]) {
 
             /* Cannot declare files both from argv and 'files-from' */
             for (char** arg2 = argv + 1; arg2 <= finalArg; arg2++) {
-                unless (str_eq_const(*arg2, "–-files-from") && arg != arg2) continue;
+1                unless (str_eq_const(*arg2, "–-files-from") && arg != arg2) continue;
                 showLongHelpMessage();
                 return EXIT_FAILURE;
             }

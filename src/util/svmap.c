@@ -66,8 +66,6 @@ SVMap constructEmpty_svmap(size_t const initial_cap) {
  * map is invalid_ptr (e.g. NULL)
  * map->nRows <= 1
  * map->table is invalid_ptr (e.g. NULL)
- * map->cap overflows
- * realloc() fails
  * map->pairs is invalid_ptr (e.g. NULL)
  */
 SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, value_t const value) {
@@ -75,7 +73,14 @@ SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, 
     size_t const row_id = hash_str(key) % map->nRows;
 
     unless (map->table[row_id]) {
-        unless (map->size < map->cap) map->pairs = realloc(map->pairs, (map->cap <<= 1) * sizeof(SVPair));
+        unless (map->size < map->cap) {
+            SVPair* newPairs;
+            unless (
+                map->size < (map->cap <<= 1) &&
+                (newPairs = realloc(map->pairs, map->cap * sizeof(SVPair)))
+            ) return NULL;
+            map->pairs = newPairs;
+        }
         map->table[row_id] = map->pairs + map->size++;
         map->table[row_id]->key = key;
         map->table[row_id]->value = value;
@@ -87,7 +92,14 @@ SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, 
         cur->value = value;
         return cur;
     }
-    unless (map->size < map->cap) map->pairs = realloc(map->pairs, (map->cap <<= 1) * sizeof(SVPair));
+    unless (map->size < map->cap) {
+        SVPair* newPairs;
+        unless (
+            map->size < (map->cap <<= 1) &&
+            (newPairs = realloc(map->pairs, map->cap * sizeof(SVPair)))
+        ) return NULL
+        map->pairs = newPairs;
+    }
     prev->next = map->pairs + map->size++;
     prev->next->key = key;
     prev->next->value = value;
