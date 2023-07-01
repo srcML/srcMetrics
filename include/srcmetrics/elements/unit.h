@@ -6,6 +6,8 @@
 #ifndef UNIT_H
     #define UNIT_H
 
+    #define UNIT_COUNT_GUESS 1024
+
     /**
      * @struct Unit
      * @brief In C, every file is a separate unit.

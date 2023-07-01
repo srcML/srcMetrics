@@ -22,22 +22,22 @@ extern Chunk            strings;
 static char*            rewind_p;
 static int              function_read_state = 0;
 
-static size_t           variables_cap       = BUFSIZ;
+static size_t           variables_cap       = VAR_COUNT_GUESS;
 static size_t           variables_count     = 0;
 static Variable*        variables           = NULL;
 
-static size_t           functions_cap       = BUFSIZ;
+static size_t           functions_cap       = FN_COUNT_GUESS;
 static size_t           functions_count     = 0;
 static Function*        functions           = NULL;
 
-static size_t           units_cap           = BUFSIZ;
+static size_t           units_cap           = UNIT_COUNT_GUESS;
 static size_t           units_count         = 0;
 static Unit*            units;
 
 static Unit const*      currentUnit         = NULL;
 static Function const*  currentFunction     = NULL;
 
-static size_t           functionStack_cap   = BUFSIZ;
+static size_t           functionStack_cap   = FN_COUNT_GUESS;
 static size_t           functionStack_size  = 0;
 static Function const*  functionStack       = NULL;
 
@@ -142,12 +142,12 @@ static void event_startDocument(struct srcsax_context* context) {
     *lastEventOfProcInfo                = NULL;
 
     unless (
-        (variables || variables = calloc(variables_cap, sizeof(Variable)))                          &&
-        (functions || functions = calloc(functions_cap, sizeof(Function)))                          &&
-        (units || units = calloc(units_cap, sizeof(Unit)))                                          &&
-        (isValid_svmap(unitMap) || isValid_svmap(unitMap = constructEmpty_svmap(BUFSIZ)))           &&
-        (isValid_svmap(functionMap) || isValid_svmap(functionMap = constructEmpty_svmap(BUFSIZ)))   &&
-        (isValid_svmap(variableMap) || isValid_svmap(variableMap = constructEmpty_svmap(BUFSIZ)))
+        (variables || variables = calloc(variables_cap, sizeof(Variable)))                                  &&
+        (functions || functions = calloc(functions_cap, sizeof(Function)))                                  &&
+        (units || units = calloc(units_cap, sizeof(Unit)))                                                  &&
+        (isValid_svmap(unitMap) || isValid_svmap(unitMap = constructEmpty_svmap(UNIT_COUNT_GUESS)))         &&
+        (isValid_svmap(functionMap) || isValid_svmap(functionMap = constructEmpty_svmap(FN_COUNT_GUESS)))   &&
+        (isValid_svmap(variableMap) || isValid_svmap(variableMap = constructEmpty_svmap(VAR_COUNT_GUESS)))
     ) return NULL;
 
     /* Free all these allocations at the end */

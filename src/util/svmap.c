@@ -97,7 +97,7 @@ SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, 
         unless (
             map->size < (map->cap <<= 1) &&
             (newPairs = realloc(map->pairs, map->cap * sizeof(SVPair)))
-        ) return NULL
+        ) return NULL;
         map->pairs = newPairs;
     }
     prev->next = map->pairs + map->size++;

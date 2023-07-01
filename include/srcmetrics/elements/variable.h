@@ -6,6 +6,8 @@
     #define VARIABLE_H
     #include <stdbool.h>
 
+    #define VAR_COUNT_GUESS 131072
+
     /**
      * @struct Variable
      * @brief Every language has variables.

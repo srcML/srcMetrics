@@ -7,6 +7,8 @@
 #ifndef FUNCTION_H
     #define FUNCTION_H
 
+    #define FN_COUNT_GUESS 16384
+
     /**
      * @struct Function
      * @brief A Function is an essential construct in almost every procedural language.
