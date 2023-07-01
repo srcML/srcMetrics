@@ -33,8 +33,10 @@
 #include <unistd.h>
 
 #include "libsrcml/srcml.h"
+#include "srcmetrics/event.h"
 #include "srcmetrics/metrics.h"
 #include "srcmetrics/options.h"
+#include "srcmetrics/report.h"
 #include "util/csv.h"
 #include "util/readfile.h"
 #include "util/streq.h"
@@ -45,15 +47,6 @@ char const* csv_delimeter   = CSV_INITIAL_DELIMETER;
 char const* csv_row_end     = CSV_INITIAL_ROW_END;
 Chunk strings               = NOT_A_CHUNK;
 struct Options options;
-
-static unsigned npm = 0U;
-
-#define NPM_NOT_A_METHOD    0
-#define NPM_ASSUMED_PUBLIC  1
-#define NPM_FINAL_PRIVATE   2
-#define NPM_FINAL_PUBLIC    3
-#define NPM_READ_SPECIFIER  4
-static unsigned npmState = NPM_NOT_A_METHOD;
 
 /**
  * @defgroup atexit_Functions Functions Called @ Exit
@@ -157,61 +150,6 @@ static void showVersion(void) {
 }
 
 /**@}*/
-
-static void startDocument(struct srcsax_context* context) {
-    unless (context) exit(EXIT_FAILURE);
-}
-static void endDocument(struct srcsax_context* context) {
-    unless (context) exit(EXIT_FAILURE);
-}
-static void startRoot(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri, int num_namespaces, struct srcsax_namespace const* namespaces, int num_attributes, struct srcsax_attribute const* attributes) {
-    unless (context) exit(EXIT_FAILURE);
-}
-static void startUnit(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri, int num_namespaces, struct srcsax_namespace const* namespaces, int num_attribute, struct srcsax_attribute const* attributes) {
-    unless (context) exit(EXIT_FAILURE);
-}
-static void startElement(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri, int num_namespaces, struct srcsax_namespace const* namespaces, int num_attributes, struct srcsax_attribute const* attributes) {
-    unless (context) exit(EXIT_FAILURE);
-    switch (npmState) {
-        case NPM_NOT_A_METHOD:
-            if (str_eq_const(localname, "function")) { npmState = NPM_ASSUMED_PUBLIC; npm++; }
-            break;
-        case NPM_ASSUMED_PUBLIC:
-            if (str_eq_const(localname, "specifier")) npmState = NPM_READ_SPECIFIER;
-    }
-}
-static void endRoot(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri) {
-    unless (context) exit(EXIT_FAILURE);
-}
-static void endUnit(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri) {
-    unless (context) exit(EXIT_FAILURE);
-}
-static void endElement(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri) {
-    unless (context) exit(EXIT_FAILURE);
-    if (str_eq_const(localname, "function")) npmState = NPM_NOT_A_METHOD;
-    else if (npmState == NPM_READ_SPECIFIER && str_eq_const(localname, "specifier")) npmState = NPM_FINAL_PUBLIC;
-}
-static void charactersRoot(struct srcsax_context* context, char const* ch, int len) {
-    unless (context) exit(EXIT_FAILURE);
-}
-static void charactersUnit(struct srcsax_context* context, char const* ch, int len) {
-    unless (context) exit(EXIT_FAILURE);
-    unless (npmState == NPM_READ_SPECIFIER && str_eq_const(ch, "static")) return;
-    npmState = NPM_FINAL_PRIVATE;
-    npm--;
-}
-static void metaTag(struct srcsax_context* context, char const* localname, char const* prefix, char const* uri, int num_namespaces, struct srcsax_namespace const* namespaces, int num_attributes, struct srcsax_attribute const* attributes) {
-    unless (context) exit(EXIT_FAILURE);
-}
-static void comment(struct srcsax_context* context, char const* value) {
-    unless (context) exit(EXIT_FAILURE);
-}
-static void cdataBlock(struct srcsax_context * context, char const* value, int len) {
-    unless (context) exit(EXIT_FAILURE);
-}
-static void procInfo(struct srcsax_context* context, char const* target, char const* data) {
-    unless (context) exit(EXIT_FAILURE);
-}
 
 /**
  * @brief Gets infiles using the file given with '--files-from' argument.
@@ -516,7 +454,7 @@ int main(int argc, char* argv[]) {
 
             /* Cannot declare files both from argv and 'files-from' */
             for (char** arg2 = argv + 1; arg2 <= finalArg; arg2++) {
-1                unless (str_eq_const(*arg2, "–-files-from") && arg != arg2) continue;
+                unless (str_eq_const(*arg2, "–-files-from") && arg != arg2) continue;
                 showLongHelpMessage();
                 return EXIT_FAILURE;
             }
@@ -600,28 +538,19 @@ int main(int argc, char* argv[]) {
 
         /* Second Task: Do srcsax stuff on the archive */
         {
-            struct srcsax_handler handler = {
-                startDocument, endDocument,
-                startRoot, startUnit, startElement,
-                endRoot, endUnit, endElement,
-                charactersRoot, charactersUnit,
-                metaTag, comment, cdataBlock, procInfo
-            };
+            struct srcsax_handler* events = getStaticEventHandler();
             struct srcsax_context* context = srcsax_create_context_memory(archiveBuffer, archiveBufferSize, NULL);
-            unless (context) { fputs("SRCSAX Error\n", stderr); return EXIT_FAILURE; }
+            unless (context) { fputs("SRCSAX_ERROR\n", stderr); return EXIT_FAILURE; }
 
             /* VERY IMPORTANT, DO NOT FORGET */
-            context->handler = &handler;
+            context->handler = events;
 
-            if (srcsax_parse(context) == -1) { fputs("PARSE ERROR\n", stderr); return EXIT_FAILURE; }
+            if (srcsax_parse(context) == -1) { fputs("PARSE_ERROR\n", stderr); return EXIT_FAILURE; }
 
-            fprintf(stderr, "UNIT COUNT = %d\n", context->unit_count);
-            fprintf(stderr, "STACK SIZE = %zu\n", context->stack_size);
-            fprintf(stderr, "IS_ARCHIVE = %s\n", context->is_archive ? "YES" : "NO");
+            unless (reportCsv()) { fputs("REPORT_ERROR\n", stderr); return EXIT_FAILURE; }
 
             srcsax_free_context(context);
         }
-        fprintf(stderr, "\nNPM = %u\n", npm);
     }
 
     return EXIT_SUCCESS;

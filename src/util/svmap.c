@@ -74,12 +74,12 @@ SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, 
 
     unless (map->table[row_id]) {
         unless (map->size < map->cap) {
-            SVPair* newPairs;
+            SVPair* newPairs = NULL;
             unless (
                 map->size < (map->cap <<= 1) &&
                 (newPairs = realloc(map->pairs, map->cap * sizeof(SVPair)))
             ) return NULL;
-            map->pairs = newPairs;
+            if (newPairs) map->pairs = newPairs;
         }
         map->table[row_id]          = map->pairs + map->size++;
         map->table[row_id]->key     = key;
@@ -93,12 +93,12 @@ SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, 
         return cur;
     }
     unless (map->size < map->cap) {
-        SVPair* newPairs;
+        SVPair* newPairs = NULL;
         unless (
             map->size < (map->cap <<= 1) &&
             (newPairs = realloc(map->pairs, map->cap * sizeof(SVPair)))
         ) return NULL;
-        map->pairs = newPairs;
+        if (newPairs) map->pairs = newPairs;
     }
     prev->next          = map->pairs + map->size++;
     prev->next->key     = key;

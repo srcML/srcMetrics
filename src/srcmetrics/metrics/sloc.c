@@ -17,7 +17,6 @@
 
 #define ENTRY_COUNT_GUESS   (UNIT_COUNT_GUESS + FN_COUNT_GUESS + VAR_COUNT_GUESS)
 
-extern Chunk            strings;
 static SVMap            sloc_statistics = NOT_AN_SVMAP;
 
 static value_t_unsigned sloc_overall;

@@ -84,4 +84,6 @@
      * @return 1 if the Chunk is valid, 0 otherwise.
      */
     bool isValid_chunk(Chunk const chunk);
+
+    extern Chunk strings;
 #endif

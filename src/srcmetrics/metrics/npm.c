@@ -17,7 +17,6 @@
 
 #define ENTRY_COUNT_GUESS   (UNIT_COUNT_GUESS + FN_COUNT_GUESS + VAR_COUNT_GUESS)
 
-extern Chunk            strings;
 static int              npm_read_state = 0;
 static SVMap            npm_statistics = NOT_AN_SVMAP;
 

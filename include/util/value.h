@@ -31,8 +31,8 @@
     #define VAL_F_STRING    "%s"
     #define VAL_F_POINTER   "%p"
     #define VAL_F_DOUBLE    "%.2lf"
-    #define VAL_F_SIGNED    PRId64
-    #define VAL_F_UNSIGNED  PRIu64
+    #define VAL_F_SIGNED    "%"PRId64
+    #define VAL_F_UNSIGNED  "%"PRIu64
 
     #define VAL_STRING(str)     ((Value){ (value_t){ .as_string     = str },    VAL_TC_STRING   })
     #define VAL_POINTER(ptr)    ((Value){ (value_t){ .as_pointer    = ptr },    VAL_TC_POINTER  })
@@ -50,7 +50,7 @@
      *   Type-code of the value.
      */
     typedef struct ValueBody {
-        value_t     value;
+        value_t     raw;
         unsigned    type_code;
     } Value;
 #endif

@@ -57,7 +57,7 @@ char* append_chunk(Chunk* const restrict chunk, char const* const restrict str, 
     }
     unless (chunk->cap == newCap) {
         chunk->cap = newCap;
-        unless ((chunk->start = realloc(chunk->start, newCap)) return NULL;
+        unless ((chunk->start = realloc(chunk->start, newCap))) return NULL;
         chunk->end = chunk->start + chunkDiff;
     }
     *(chunk->end = (start = memcpy(chunk->end, str, n)) + n) = '\0';

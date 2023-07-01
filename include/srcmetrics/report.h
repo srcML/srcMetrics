@@ -11,6 +11,8 @@
     #include "srcmetrics/metrics/npm.h"
     #include "srcmetrics/metrics/sloc.h"
 
+    typedef SVMap*(*Report)(void);
+
     /**
      * @brief Calls all enabled metric Report functions.
      * @return 0 if something is wrong report, 1 otherwise.
