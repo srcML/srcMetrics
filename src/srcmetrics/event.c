@@ -232,5 +232,3 @@ bool register_all_events(char* archiveBuffer, size_t const archiveSize) {
 
     return 1;
 }
-
-
