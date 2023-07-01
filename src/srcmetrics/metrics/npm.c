@@ -6,30 +6,38 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "srcmetrics/elements/function.h"
+#include "srcmetrics/elements/unit.h"
+#include "srcmetrics/elements/variable.h"
 #include "srcmetrics/metrics/npm.h"
 #include "util/chunk.h"
 #include "util/repeat.h"
 #include "util/streq.h"
 #include "util/unless.h"
 
-extern Chunk    strings;
-static int      npm_read_state = 0;
-static SVMap    npm_statistics = NOT_AN_SVMAP;
+#define ENTRY_COUNT_GUESS   (UNIT_COUNT_GUESS + FN_COUNT_GUESS + VAR_COUNT_GUESS)
 
-static double   npm_overall;
-static double   npm_currentUnit;
+extern Chunk            strings;
+static int              npm_read_state = 0;
+static SVMap            npm_statistics = NOT_AN_SVMAP;
+
+static value_t_unsigned npm_overall;
+static value_t_unsigned npm_currentUnit;
+
+static free_npm_statistics(void) { free_svmap(npm_statistics); }
 
 void event_startDocument_npm(struct srcsax_context* context, ...) {
     unless (
         isValid_svmap(npm_statistics) ||
-        isValid_svmap(npm_statistics = constructEmpty_svmap(BUFSIZ))
+        isValid_svmap(npm_statistics = constructEmpty_svmap(ENTRY_COUNT_GUESS))
     ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
 
+    atexit(free_npm_statistics);
     npm_overall = 0;
 }
 
 void event_endDocument_npm(struct srcsax_context* context, ...) {
-    unless (insert_svmap(&npm_statistics, "NPM", (value_t){ .as_double = npm_overall })) {
+    unless (insert_svmap(&npm_statistics, "NPM", VAL_UNSIGNED(npm_overall))) {
         fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE);
     }
 }
@@ -52,7 +60,7 @@ void event_endUnit_npm(struct srcsax_context* context, ...) {
     unless (
         (npmKey = add_chunk(&strings, "NPM_"))  &&
         append_chunk(&strings, currentUnit)     &&
-        insert_svmap(&npm_statistics, npmKey, (value_t){ .as_double = npm_currentUnit })
+        insert_svmap(&npm_statistics, npmKey, VAL_UNSIGNED(npm_currentUnit))
     ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
 }
 

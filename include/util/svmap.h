@@ -2,25 +2,19 @@
  * @file svmap.h
  * @brief Defines SVMap (String-Value Map), SVPair (String-Value Pair), and value_t.
  * @author Yavuz Koroglu
+ * @see Value
  */
 #ifndef SVMAP_H
     #define SVMAP_H
     #include <stdbool.h>
     #include <stddef.h>
+    #include "value.h"
 
     /**
      * @def NOT_AN_SVMAP
      *   A special SVMap denoting a NOT-SVMap. This SVMap cannot pass the isValid_svmap() test.
      */
     #define NOT_AN_SVMAP ((SVMap){ 0, 0, 0, NULL, NULL })
-
-    typedef union value_t_body {
-        char*       as_string;
-        void*       as_pointer;
-        double      as_double;
-        long        as_long;
-        unsigned    as_unsigned;
-    } value_t;
 
     /**
      * @struct SVPair
@@ -35,7 +29,7 @@
      */
     typedef struct SVPairBody {
         char const*         key;
-        value_t             value;
+        Value               value;
         struct SVPairBody*  next;
     } SVPair;
 
@@ -83,7 +77,7 @@
      * @param value The value.
      * @return NULL if insertion went wrong, a pointer to the inserted SVPair otherwise.
      */
-    SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, value_t const value);
+    SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, Value const value);
 
     /**
      * @brief Gets a value from an SVMap.
@@ -91,7 +85,7 @@
      * @param key The key string.
      * @return NULL if the key is NOT found, a pointer to the corresponding value otherwise.
      */
-    value_t* get_svmap(SVMap const* const restrict map, char const* const restrict key);
+    Value* get_svmap(SVMap const* const restrict map, char const* const restrict key);
 
     /**
      * @brief Deletes a key-value pair from an SVMap.

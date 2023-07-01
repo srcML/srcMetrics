@@ -6,7 +6,6 @@
  */
 #ifndef NPM_H
     #define NPM_H
-    #include <stddef.h>
     #include "libsrcsax/srcsax.h"
     #include "util/svmap.h"
 

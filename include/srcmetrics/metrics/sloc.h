@@ -6,7 +6,6 @@
  */
 #ifndef SLOC_H
     #define SLOC_H
-    #include <stddef.h>
     #include "libsrcsax/srcsax.h"
     #include "util/svmap.h"
 

@@ -4,7 +4,6 @@
  * @author Yavuz Koroglu
  * @see event.h
  */
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,7 +69,6 @@ static Event* eventsAtCDataBlock    [METRICS_COUNT_MAX + 1];
 static Event* eventsAtProcInfo      [METRICS_COUNT_MAX + 1];
 
 static void event_startDocument(struct srcsax_context* context) {
-    static bool thisFnCalledOnce                = 0;
     static char const* metrics[]                = METRICS;
     static Event* allEventsAtStartDocument[]    = ALL_EVENTS_AT_START_DOCUMENT;
     static Event* allEventsAtEndDocument[]      = ALL_EVENTS_AT_END_DOCUMENT;
@@ -151,7 +149,7 @@ static void event_startDocument(struct srcsax_context* context) {
     ) return NULL;
 
     /* Free all these allocations at the end */
-    unless (thisFnCalledOnce) { atexit(free_eventElements); thisFnCalledOnce = 1; }
+    atexit(free_eventElements);
 
     rewind_p = strings->end;
 

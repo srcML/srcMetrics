@@ -68,7 +68,7 @@ SVMap constructEmpty_svmap(size_t const initial_cap) {
  * map->table is invalid_ptr (e.g. NULL)
  * map->pairs is invalid_ptr (e.g. NULL)
  */
-SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, value_t const value) {
+SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, Value const value) {
     SVPair *prev, *cur;
     size_t const row_id = hash_str(key) % map->nRows;
 
@@ -81,10 +81,10 @@ SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, 
             ) return NULL;
             map->pairs = newPairs;
         }
-        map->table[row_id] = map->pairs + map->size++;
-        map->table[row_id]->key = key;
-        map->table[row_id]->value = value;
-        map->table[row_id]->next = NULL;
+        map->table[row_id]          = map->pairs + map->size++;
+        map->table[row_id]->key     = key;
+        map->table[row_id]->value   = value;
+        map->table[row_id]->next    = NULL;
         return map->table[row_id];
     }
     for (prev = NULL, cur = map->table[row_id]; cur; prev = cur, cur = cur->next) {
@@ -100,10 +100,10 @@ SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, 
         ) return NULL;
         map->pairs = newPairs;
     }
-    prev->next = map->pairs + map->size++;
-    prev->next->key = key;
-    prev->next->value = value;
-    prev->next->next = NULL;
+    prev->next          = map->pairs + map->size++;
+    prev->next->key     = key;
+    prev->next->value   = value;
+    prev->next->next    = NULL;
     return prev->next;
 }
 
@@ -115,7 +115,7 @@ SVPair* insert_svmap(SVMap* const restrict map, char const* const restrict key, 
  * map->nRows <= 1
  * map->table is invalid_ptr (e.g. NULL)
  */
-value_t* get_svmap(SVMap const* const restrict map, char const* const restrict key) {
+Value* get_svmap(SVMap const* const restrict map, char const* const restrict key) {
     size_t const row_id = hash_str(key) % map->nRows;
 
     unless (map->table[row_id]) return NULL;

@@ -6,30 +6,40 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "srcmetrics/elements/function.h"
+#include "srcmetrics/elements/unit.h"
+#include "srcmetrics/elements/variable.h"
 #include "srcmetrics/metrics/sloc.h"
 #include "util/chunk.h"
 #include "util/repeat.h"
 #include "util/streq.h"
 #include "util/unless.h"
 
-extern Chunk    strings;
-static SVMap    sloc_statistics = NOT_AN_SVMAP;
+#define ENTRY_COUNT_GUESS   (UNIT_COUNT_GUESS + FN_COUNT_GUESS + VAR_COUNT_GUESS)
 
-static double   sloc_overall;
-static double   sloc_currentUnit;
-static double   sloc_currentFunction;
+extern Chunk            strings;
+static SVMap            sloc_statistics = NOT_AN_SVMAP;
+
+static value_t_unsigned sloc_overall;
+static value_t_unsigned sloc_currentUnit;
+static value_t_unsigned sloc_currentFunction;
+
+static void free_sloc_statistics(void) {
+    free_svmap(sloc_statistics);
+}
 
 void event_startDocument_sloc(struct srcsax_context* context, ...) {
     unless (
         isValid_svmap(sloc_statistics) ||
-        isValid_svmap(sloc_statistics = constructEmpty_svmap(BUFSIZ))
+        isValid_svmap(sloc_statistics = constructEmpty_svmap(ENTRY_COUNT_GUESS))
     ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
 
+    atexit(free_sloc_statistics);
     sloc_overall = 0;
 }
 
 void event_endDocument_sloc(struct srcsax_context* context, ...) {
-    unless (insert_svmap(&sloc_statistics, "SLOC", (value_t){ .as_double = sloc_overall })) {
+    unless (insert_svmap(&sloc_statistics, "SLOC", VAL_UNSIGNED(sloc_overall))) {
         fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE);
     }
 }
@@ -52,7 +62,7 @@ void event_endUnit_sloc(struct srcsax_context* context, ...) {
     unless (
         (slocKey = add_chunk(&strings, "SLOC_"))    &&
         append_chunk(&strings, currentUnit)         &&
-        insert_svmap(&sloc_statistics, slocKey, (value_t){ .as_double = sloc_currentUnit })
+        insert_svmap(&sloc_statistics, slocKey, VAL_UNSIGNED(sloc_currentUnit))
     ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
 }
 
@@ -82,6 +92,7 @@ void event_endElement_sloc(struct srcsax_context* context, ...) {
 
     va_start(args, context);
     localname = va_arg(args, char const*);
+    /* Unused variables: prefix, uri. */
     repeat (2) va_arg(args, char const*);
     currentUnit = va_arg(args, char const*);
     currentFunction = va_arg(args, char const*);
@@ -92,8 +103,9 @@ void event_endElement_sloc(struct srcsax_context* context, ...) {
     unless (
         (slocKey = add_chunk(&strings, "SLOC_") &&
         append_chunk(&strings, currentUnit)     &&
+        append_chunk(&strings, "::")            &&
         append_chunk(&strings, currentFunction) &&
-        insert_svmap(&sloc_statistics, slocKey, (value_t){ .as_double = sloc_currentFunction })
+        insert_svmap(&sloc_statistics, slocKey, VAL_UNSIGNED(sloc_currentFunction))
     ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
 }
 

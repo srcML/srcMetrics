@@ -1,6 +1,6 @@
 /**
  * @file report.h
- * @brief Defines the Report function-type.
+ * @brief Defines the reportCsv() function.
  * @author Yavuz Koroglu
  * @see report.c
  */
@@ -11,11 +11,9 @@
     #include "srcmetrics/metrics/npm.h"
     #include "srcmetrics/metrics/sloc.h"
 
-    typedef SVMap*(*Report)(void);
-
     /**
      * @brief Calls all enabled metric Report functions.
-     * @return 0 if there is something wrong with the output, 1 otherwise.
+     * @return 0 if something is wrong report, 1 otherwise.
      */
     bool reportCsv(void);
 
