@@ -46,13 +46,20 @@ char* add_chunk(Chunk* const restrict chunk, char const* const restrict str, siz
  * chunk->end is invalid_ptr (e.g. NULL)
  * chunk->end < chunk->start
  * chunk->cap == 0
- * chunk->cap overflows
- * realloc() fails
  */
 char* append_chunk(Chunk* const restrict chunk, char const* const restrict str, size_t const n) {
+    size_t newCap               = chunk->cap;
+    ptrdiff_t const chunkDiff   = chunk->end - chunk->start;
+    size_t const len            = ((size_t)chunkDiff + n);
     char* start;
-    size_t const len = (size_t)((uintptr_t)chunk->end - (uintptr_t)chunk->start + (uintptr_t)n);
-    until (chunk->cap > len) chunk->end = (chunk->start = realloc(chunk->start, (chunk->cap <<= 1))) + len - n;
+    until (newCap > len) {
+        unless (chunk->cap < (newCap <<= 1)) return NULL;
+    }
+    unless (chunk->cap == newCap) {
+        chunk->cap = newCap;
+        unless ((chunk->start = realloc(chunk->start, newCap)) return NULL;
+        chunk->end = chunk->start + chunkDiff;
+    }
     *(chunk->end = (start = memcpy(chunk->end, str, n)) + n) = '\0';
     return start;
 }

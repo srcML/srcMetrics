@@ -12,7 +12,10 @@
 #include "srcmetrics/elements/unit.h"
 #include "srcmetrics/elements/variable.h"
 #include "util/chunk.h"
+#include "util/streq.h"
 #include "util/svmap.h"
+
+static int function_read_state              = 0;
 
 static size_t           variables_cap       = BUFSIZ;
 static size_t           variables_count     = 0;
@@ -29,6 +32,7 @@ static Unit*            units;
 static Unit const*      currentUnit         = NULL;
 static Function const*  currentFunction     = NULL;
 
+static Chunk            functionDesignators = NOT_A_CHUNK;
 static size_t           functionStack_cap   = BUFSIZ;
 static size_t           functionStack_size  = 0;
 static Function const*  functionStack       = NULL;
@@ -47,6 +51,7 @@ static void free_eventElements(void) {
     free_svmap(unitMap);
     free_svmap(functionMap);
     free_svmap(variableMap);
+    free_chunk(functionDesignators);
     srcsax_free_context(context);
 }
 
@@ -106,10 +111,16 @@ static void event_startUnit(
         )
     ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
 
+    unless (
+        currentFunction == NULL &&
+        functionStack_size == 0 &&
+        function_read_state == 0
+    ) { fputs("PARSE_ERROR\n", stderr); exit(EXIT_FAILURE); }
+
     currentUnit = NULL;
     for (struct srcsax_attribute const* attribute = attributes + num_attributes - 1; attribute >= attributes; attribute--) {
         unless (str_eq_const(attribute->localname, "filename")) continue;
-        currentUnit = units[units_count++] = (Unit){ attribute->value };
+        *(currentUnit = units[units_count++]) = (Unit){ attribute->value };
     }
     unless (currentUnit) { fputs("PARSE_ERROR\n", stderr); exit(EXIT_FAILURE); }
 
@@ -130,6 +141,32 @@ static void event_startElement(
     int                             num_attributes,
     struct srcsax_attribute const*  attributes
 ) {
+    if (str_eq_const(localname, "function")) {
+        unless (
+            (
+                functions_count < functions_cap ||
+                (
+                    functions_count < (functions_cap <<= 1) &&
+                    (functions = realloc(functions, functions_cap * sizeof(Function)))
+                )
+            ) && (
+                functionStack_size < functionStack_cap ||
+                (
+                    functionStack_size < (functionStack_cap <<= 1) &&
+                    (functionStack = realloc(functionStack, functionStack_cap * sizeof(Function)))
+                )
+            )
+        ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
+
+        *(currentFunction = functions[functions_count++] = functionStack[functionStack_size++]) = (Function){ "Unknown Function", currentUnit, NULL };
+
+        function_read_state = 1;
+    } else if (function_read_state == 1 && str_eq_const(localname, "type")) {
+        function_read_state = 2;
+    } else if (function_read_state == 3 && str_eq_const(localname, "name")) {
+        function_read_state = 4;
+    }
+
     /* Execute all related events */
     for (Event** event = eventsAtStartElement; *event; event++)
         (**event)(context, localname, prefix, uri, num_namespaces, namespaces, num_attributes, attributes, currentUnit, currentFunction);
@@ -162,6 +199,20 @@ static void event_endElement(
     char const*                     prefix,
     char const*                     uri
 ) {
+    if (str_eq_const(localname, "function")) {
+        unless (functionStack_size) { fputs("Corrupt Function Stack\n", stderr); exit(EXIT_FAILURE); }
+
+        currentFunction = --functionStack_size ? functionStack[functionStack_size - 1] : NULL;
+        function_read_state = (functionStack_size ? 5 : 0);
+    } else if (function_read_state == 2 && str_eq_const(localname, "type")) {
+        function_read_state == 3;
+    } else if (function_read_state == 4 && str_eq_const(localname, "name")) {
+        function_read_state == 5;
+    } else if (function_read_state == 5 && str_eq_const(currentFunction->name, "Unknown Function")) {
+        fputs("PARSE_ERROR\n", stderr);
+        exit(EXIT_FAILURE);
+    }
+
     /* Execute all related events */
     for (Event** event = eventsAtEndElement; *event; event++)
         (**event)(context, localname, prefix, uri);
@@ -172,6 +223,16 @@ static void event_charactersRoot(struct srcsax_context* context, char const* ch,
         (**event)(context, ch, len);
 }
 static void event_charactersUnit(struct srcsax_context* context, char const* ch, int len) {
+    if (function_read_state == 4) {
+        currentFunction->name = ch;
+        unless (
+            (currentFunction->designator = add_chunk(&functionDesignators, currentFunction->ownerUnit)) &&
+            append_chunk(&functionDesignators, "::")                                                    &&
+            append_chunk(&functionDesignators, currentFunction->name)                                   &&
+            insert_svmap(&functionMap, currentFunction->designator, (value_t){ .as_pointer = currentFunction }
+        ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
+    }
+
     /* Execute all related events */
     for (Event** event = eventsAtCharactersUnit; *event; event++)
         (**event)(context, ch, len);
@@ -292,7 +353,8 @@ struct srcsax_handler* registerAllEnabledEvents(void) {
         (units || units = calloc(units_cap, sizeof(Unit)))                                          &&
         (isValid_svmap(unitMap) || isValid_svmap(unitMap = constructEmpty_svmap(BUFSIZ)))           &&
         (isValid_svmap(functionMap) || isValid_svmap(functionMap = constructEmpty_svmap(BUFSIZ)))   &&
-        (isValid_svmap(variableMap) || isValid_svmap(variableMap = constructEmpty_svmap(BUFSIZ)))
+        (isValid_svmap(variableMap) || isValid_svmap(variableMap = constructEmpty_svmap(BUFSIZ)))   &&
+        (isValid_chunk(functionDesignators) || isValid_chunk(functionDesignators = constructEmpty_chunk(BUFSIZ)))
     ) return NULL;
 
     /* Free all these allocations at the end */

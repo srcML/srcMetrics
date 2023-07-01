@@ -55,7 +55,7 @@
      * @param chunk The Chunk.
      * @param str The string.
      * @param n #characters to copy.
-     * @return A pointer to the string's location in the Chunk.
+     * @return NULL if something goes wrong, a pointer to the string's location in the Chunk otherwise.
      */
     char* add_chunk(Chunk* const restrict chunk, char const* const restrict str, size_t const n);
 
@@ -68,7 +68,7 @@
      * @param chunk The Chunk.
      * @param str The string.
      * @param n #characters to copy.
-     * @return A pointer to the final string in the Chunk.
+     * @return NULL if something goes wrong, a pointer to the string's location in the Chunk otherwise.
      */
     char* append_chunk(Chunk* const restrict chunk, char const* const restrict str, size_t const n);
 
