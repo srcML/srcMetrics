@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include "srcmetrics/event.h"
 #include "srcmetrics/metrics.h"
+#include "srcmetrics/options.h"
 #include "srcmetrics/elements/function.h"
 #include "srcmetrics/elements/unit.h"
 #include "srcmetrics/elements/variable.h"
@@ -15,11 +16,11 @@
 
 static size_t           variables_cap       = BUFSIZ;
 static size_t           variables_count     = 0;
-static Variable*        variables;
+static Variable*        variables           = NULL;
 
 static size_t           functions_cap       = BUFSIZ;
 static size_t           functions_count     = 0;
-static Function*        functions;
+static Function*        functions           = NULL;
 
 static size_t           units_cap           = BUFSIZ;
 static size_t           units_count         = 0;
@@ -30,11 +31,11 @@ static Function const*  currentFunction     = NULL;
 
 static size_t           functionStack_cap   = BUFSIZ;
 static size_t           functionStack_size  = 0;
-static Function const*  functionStack;
+static Function const*  functionStack       = NULL;
 
-static SVMap            unitMap;
-static SVMap            functionMap;
-static SVMap            variableMap;
+static SVMap            unitMap             = NOT_AN_SVMAP;
+static SVMap            functionMap         = NOT_AN_SVMAP;
+static SVMap            variableMap         = NOT_AN_SVMAP;
 
 static struct srcsax_context* context       = NULL;
 
@@ -49,19 +50,19 @@ static void free_eventElements(void) {
     srcsax_free_context(context);
 }
 
-static Event* eventsAtStartDocument[METRICS_COUNT_MAX]  = { NULL };
-static Event* eventsAtEndDocument[METRICS_COUNT_MAX]    = { NULL };
-static Event* eventsAtStartRoot[METRICS_COUNT_MAX]      = { NULL };
-static Event* eventsAtStartUnit[METRICS_COUNT_MAX]      = { NULL };
-static Event* eventsAtStartElement[METRICS_COUNT_MAX]   = { NULL };
-static Event* eventsAtEndRoot[METRICS_COUNT_MAX]        = { NULL };
-static Event* eventsAtEndUnit[METRICS_COUNT_MAX]        = { NULL };
-static Event* eventsAtEndElement[METRICS_COUNT_MAX]     = { NULL };
-static Event* eventsAtCharactersRoot[METRICS_COUNT_MAX] = { NULL };
-static Event* eventsAtCharactersUnit[METRICS_COUNT_MAX] = { NULL };
-static Event* eventsAtComment[METRICS_COUNT_MAX]        = { NULL };
-static Event* eventsAtCDataBlock[METRICS_COUNT_MAX]     = { NULL };
-static Event* eventsAtProcInfo[METRICS_COUNT_MAX]       = { NULL };
+static Event* eventsAtStartDocument[METRICS_COUNT_MAX + 1];
+static Event* eventsAtEndDocument[METRICS_COUNT_MAX + 1];
+static Event* eventsAtStartRoot[METRICS_COUNT_MAX + 1];
+static Event* eventsAtStartUnit[METRICS_COUNT_MAX + 1];
+static Event* eventsAtStartElement[METRICS_COUNT_MAX + 1];
+static Event* eventsAtEndRoot[METRICS_COUNT_MAX + 1];
+static Event* eventsAtEndUnit[METRICS_COUNT_MAX + 1];
+static Event* eventsAtEndElement[METRICS_COUNT_MAX + 1];
+static Event* eventsAtCharactersRoot[METRICS_COUNT_MAX + 1];
+static Event* eventsAtCharactersUnit[METRICS_COUNT_MAX + 1];
+static Event* eventsAtComment[METRICS_COUNT_MAX + 1];
+static Event* eventsAtCDataBlock[METRICS_COUNT_MAX + 1];
+static Event* eventsAtProcInfo[METRICS_COUNT_MAX + 1];
 
 static void event_startDocument(struct srcsax_context* context) {
     /* Execute all related events */
@@ -213,22 +214,89 @@ static struct srcsax_handler* events = {
     event_metaTag, event_comment, event_cdataBlock, event_procInfo
 };
 
-bool register_all_events(char* archiveBuffer, size_t const archiveSize) {
+struct srcsax_handler* registerAllEnabledEvents(void) {
+    static bool thisFnCalledOnce                = 0;
+    static char const* metrics[]                = METRICS;
+    static Event* allEventsAtStartDocument[]    = ALL_EVENTS_AT_START_DOCUMENT;
+    static Event* allEventsAtEndDocument[]      = ALL_EVENTS_AT_END_DOCUMENT;
+    static Event* allEventsAtStartRoot[]        = ALL_EVENTS_AT_START_ROOT;
+    static Event* allEventsAtStartUnit[]        = ALL_EVENTS_AT_START_UNIT;
+    static Event* allEventsAtStartElement[]     = ALL_EVENTS_AT_START_ELEMENT;
+    static Event* allEventsAtEndRoot[]          = ALL_EVENTS_AT_START_ROOT;
+    static Event* allEventsAtEndUnit[]          = ALL_EVENTS_AT_START_UNIT;
+    static Event* allEventsAtEndElement[]       = ALL_EVENTS_AT_START_ELEMENT;
+    static Event* allEventsAtCharactersRoot[]   = ALL_EVENTS_AT_CHARACTERS_ROOT;
+    static Event* allEventsAtCharactersUnit[]   = ALL_EVENTS_AT_CHARACTERS_UNIT;
+    static Event* allEventsAtMetaTag[]          = ALL_EVENTS_AT_META_TAG;
+    static Event* allEventsAtComment[]          = ALL_EVENTS_AT_COMMENT;
+    static Event* allEventsAtCDataBlock[]       = ALL_EVENTS_AT_CDATA_BLOCK;
+    static Event* allEventsAtProcInfo[]         = ALL_EVENTS_AT_PROC_INFO;
+
+    Event** lastEventOfStartDocument            = eventsAtStartDocument;
+    Event** lastEventOfEndDocument              = eventsAtEndDocument;
+    Event** lastEventOfStartRoot                = eventsAtStartRoot;
+    Event** lastEventOfStartUnit                = eventsAtStartUnit;
+    Event** lastEventOfStartElement             = eventsAtStartElement;
+    Event** lastEventOfEndRoot                  = eventsAtEndRoot;
+    Event** lastEventOfEndUnit                  = eventsAtEndUnit;
+    Event** lastEventOfEndElement               = eventsAtEndElement;
+    Event** lastEventOfCharactersRoot           = eventsAtCharactersRoot;
+    Event** lastEventOfCharactersUnit           = eventsAtCharactersUnit;
+    Event** lastEventOfMetaTag                  = eventsAtMetaTag;
+    Event** lastEventOfComment                  = eventsAtComment;
+    Event** lastEventOfCDataBlock               = eventsAtCDataBlock;
+    Event** lastEventOfProcInfo                 = eventsAtProcInfo;
+
+    char const** metric      = metrics;
+    size_t metricId          = 0;
+    uint_fast64_t metricMask = 1;
+    for (;
+        *metric && metricId < METRICS_COUNT_MAX;
+        (metric++, metricId++, metricMask <<= 1)
+    ) {
+        unless (options.enabledMetrics && metricMask) continue;
+
+        *(lastEventOfStartDocument++)   = allEventsAtStartDocument[metricId];
+        *(lastEventOfEndDocument++)     = allEventsAtEndDocument[metricId];
+        *(lastEventOfStartRoot++)       = allEventsAtStartRoot[metricId];
+        *(lastEventOfStartUnit++)       = allEventsAtStartUnit[metricId];
+        *(lastEventOfStartElement++)    = allEventsAtStartElement[metricId];
+        *(lastEventOfEndRoot++)         = allEventsAtEndRoot[metricId];
+        *(lastEventOfEndUnit++)         = allEventsAtEndUnit[metricId];
+        *(lastEventOfEndElement++)      = allEventsAtEndElement[metricId];
+        *(lastEventOfCharactersRoot++)  = allEventsAtCharactersRoot[metricId];
+        *(lastEventOfCharactersUnit++)  = allEventsAtCharactersUnit[metricId];
+        *(lastEventOfMetaTag++)         = allEventsAtMetaTag[metricId];
+        *(lastEventOfComment++)         = allEventsAtComment[metricId];
+        *(lastEventOfCDataBlock++)      = allEventsAtCDataBlock[metricId];
+        *(lastEventOfProcInfo++)        = allEventsAtProcInfo[metricId];
+    }
+    *lastEventOfStartDocument           = NULL;
+    *lastEventOfEndDocument             = NULL;
+    *lastEventOfStartRoot               = NULL;
+    *lastEventOfStartUnit               = NULL;
+    *lastEventOfStartElement            = NULL;
+    *lastEventOfEndRoot                 = NULL;
+    *lastEventOfEndUnit                 = NULL;
+    *lastEventOfEndElement              = NULL;
+    *lastEventOfCharactersRoot          = NULL;
+    *lastEventOfCharactersUnit          = NULL;
+    *lastEventOfMetaTag                 = NULL;
+    *lastEventOfComment                 = NULL;
+    *lastEventOfCDataBlock              = NULL;
+    *lastEventOfProcInfo                = NULL;
+
     unless (
-        (context = srcsax_create_context_memory(archiveBuffer, archiveSize, NULL))          &&
-        (variables = calloc(variables_cap, sizeof(Variable)))                               &&
-        (functions = calloc(functions_cap, sizeof(Function)))                               &&
-        (units = calloc(units_cap, sizeof(Unit)))                                           &&
-        (unitMap = constructEmpty_svmap(BUFSIZ))                                            &&
-        (functionMap = constructEmpty_svmap(BUFSIZ))                                        &&
-        (variableMap = constructEmpty_svmap(BUFSIZ))
-    ) return 0;
+        (variables || variables = calloc(variables_cap, sizeof(Variable)))                          &&
+        (functions || functions = calloc(functions_cap, sizeof(Function)))                          &&
+        (units || units = calloc(units_cap, sizeof(Unit)))                                          &&
+        (isValid_svmap(unitMap) || isValid_svmap(unitMap = constructEmpty_svmap(BUFSIZ)))           &&
+        (isValid_svmap(functionMap) || isValid_svmap(functionMap = constructEmpty_svmap(BUFSIZ)))   &&
+        (isValid_svmap(variableMap) || isValid_svmap(variableMap = constructEmpty_svmap(BUFSIZ)))
+    ) return NULL;
 
     /* Free all these allocations at the end */
-    atexit(free_eventElements);
+    unless (thisFnCalledOnce) { atexit(free_eventElements); thisFnCalledOnce = 1; }
 
-    /* In this context, we handle our events */
-    context->handler = events;
-
-    return 1;
+    return events;
 }
