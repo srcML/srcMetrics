@@ -164,5 +164,18 @@ void free_svmap(SVMap const map) {
  * ===================
  */
 bool isValid_svmap(SVMap const map) {
-    return map.pairs && map.table && map.nRows <= 1 && map.size < map.cap;
+    return map.pairs && map.table && map.nRows > 1 && map.size < map.cap;
+}
+
+/*
+ * Fault Case Analysis
+ * ===================
+ * map is invalid_ptr (e.g. NULL)
+ * map->nRows <= 1
+ * map->table is invalid_ptr (e.g. NULL)
+ */
+void empty_svmap(SVMap* const restrict map) {
+    map->size = 0;
+    for (SVPair** pair = map->table + map->nRows - 1; pair >= map->table; pair--)
+        *pair = NULL;
 }

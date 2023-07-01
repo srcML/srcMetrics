@@ -1,6 +1,25 @@
+/**
+ * @file function.h
+ * @brief Defines Function.
+ * @author Yavuz Koroglu
+ * @see Function
+ */
 #ifndef FUNCTION_H
     #define FUNCTION_H
 
+    /**
+     * @struct Function
+     * @brief A Function is an essential construct in almost every procedural language.
+     *
+     * @var Function::name
+     *   Name of the function.
+     * @var Function::ownerUnit
+     *   Name of the owner unit.
+     * @var Function::designator
+     *   The function designator, a.k.a "owner::function.name".
+     *
+     * @see Unit
+     */
     typedef struct FunctionBody {
         char const* name;
         char const* ownerUnit;

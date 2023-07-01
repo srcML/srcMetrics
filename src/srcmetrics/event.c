@@ -1,5 +1,8 @@
 /**
  * @file event.c
+ * @brief Implements functions defined in event.h.
+ * @author Yavuz Koroglu
+ * @see event.h
  */
 #include <stdbool.h>
 #include <stddef.h>
@@ -16,6 +19,7 @@
 #include "util/svmap.h"
 
 extern Chunk            strings;
+static char*            rewind_p;
 static int              function_read_state = 0;
 
 static size_t           variables_cap       = BUFSIZ;
@@ -49,22 +53,21 @@ static void free_eventElements(void) {
     free_svmap(unitMap);
     free_svmap(functionMap);
     free_svmap(variableMap);
-    srcsax_free_context(context);
 }
 
-static Event* eventsAtStartDocument[METRICS_COUNT_MAX + 1];
-static Event* eventsAtEndDocument[METRICS_COUNT_MAX + 1];
-static Event* eventsAtStartRoot[METRICS_COUNT_MAX + 1];
-static Event* eventsAtStartUnit[METRICS_COUNT_MAX + 1];
-static Event* eventsAtStartElement[METRICS_COUNT_MAX + 1];
-static Event* eventsAtEndRoot[METRICS_COUNT_MAX + 1];
-static Event* eventsAtEndUnit[METRICS_COUNT_MAX + 1];
-static Event* eventsAtEndElement[METRICS_COUNT_MAX + 1];
+static Event* eventsAtStartDocument [METRICS_COUNT_MAX + 1];
+static Event* eventsAtEndDocument   [METRICS_COUNT_MAX + 1];
+static Event* eventsAtStartRoot     [METRICS_COUNT_MAX + 1];
+static Event* eventsAtStartUnit     [METRICS_COUNT_MAX + 1];
+static Event* eventsAtStartElement  [METRICS_COUNT_MAX + 1];
+static Event* eventsAtEndRoot       [METRICS_COUNT_MAX + 1];
+static Event* eventsAtEndUnit       [METRICS_COUNT_MAX + 1];
+static Event* eventsAtEndElement    [METRICS_COUNT_MAX + 1];
 static Event* eventsAtCharactersRoot[METRICS_COUNT_MAX + 1];
 static Event* eventsAtCharactersUnit[METRICS_COUNT_MAX + 1];
-static Event* eventsAtComment[METRICS_COUNT_MAX + 1];
-static Event* eventsAtCDataBlock[METRICS_COUNT_MAX + 1];
-static Event* eventsAtProcInfo[METRICS_COUNT_MAX + 1];
+static Event* eventsAtComment       [METRICS_COUNT_MAX + 1];
+static Event* eventsAtCDataBlock    [METRICS_COUNT_MAX + 1];
+static Event* eventsAtProcInfo      [METRICS_COUNT_MAX + 1];
 
 static void event_startDocument(struct srcsax_context* context) {
     static bool thisFnCalledOnce                = 0;
@@ -150,11 +153,27 @@ static void event_startDocument(struct srcsax_context* context) {
     /* Free all these allocations at the end */
     unless (thisFnCalledOnce) { atexit(free_eventElements); thisFnCalledOnce = 1; }
 
+    rewind_p = strings->end;
+
     /* Execute all related events */
     for (Event** event = eventsAtStartDocument; *event; event++)
         (**event)(context);
 }
 static void event_endDocument(struct srcsax_context* context) {
+    /*
+    currentUnit         = NULL;
+    currentFunction     = NULL;
+    strings->end        = rewind_p;
+    function_read_state = 0;
+    variables_count     = 0;
+    functions_count     = 0;
+    units_count         = 0;
+    functionStack_size  = 0;
+    empty_svmap(unitMap);
+    empty_svmap(functionMap);
+    empty_svmap(variableMap);
+    */
+
     /* Execute all related events */
     for (Event** event = eventsAtEndDocument; *event; event++)
         (**event)(context);
@@ -238,7 +257,7 @@ static void event_startElement(
             )
         ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
 
-        *(currentFunction = functions[functions_count++] = functionStack[functionStack_size++]) = (Function){ "Unknown Function", currentUnit, NULL };
+        *(currentFunction = functions[functions_count++] = functionStack[functionStack_size++]) = (Function){ "Unknown Function", currentUnit->name, NULL };
 
         function_read_state = 1;
     } else if (function_read_state == 1 && str_eq_const(localname, "type")) {

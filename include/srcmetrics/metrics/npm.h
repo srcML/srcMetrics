@@ -1,8 +1,15 @@
+/**
+ * @file npm.h
+ * @brief Number of Public Methods
+ * @author Yavuz Koroglu
+ * @see npm.c
+ */
 #ifndef NPM_H
     #define NPM_H
     #include <stddef.h>
     #include "libsrcsax/srcsax.h"
 
+    void event_startDocument_npm    (struct srcsax_context* context, ...);
     void event_startUnit_npm        (struct srcsax_context* context, ...);
     void event_endUnit_npm          (struct srcsax_context* context, ...);
     void event_startElement_npm     (struct srcsax_context* context, ...);

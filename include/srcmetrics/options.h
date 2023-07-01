@@ -1,7 +1,6 @@
 /**
  * @file options.h
  * @brief Defines Options and the initial options before command-line arguments.
- *
  * @author Yavuz Koroglu
  */
 #ifndef OPTIONS_H

@@ -1,9 +1,19 @@
+/**
+ * @file event.h
+ * @brief Defines the Event function.
+ * @author Yavuz Koroglu
+ * @see event.c
+ */
 #ifndef EVENT_H
     #define EVENT_H
     #include "libsrcsax/srcsax.h"
 
     typedef void(*Event)(struct srcsax_context*, ...);
 
+    /**
+     * @brief Gets a pointer to the static event handler for metrics.
+     * @return A pointer to the metric event handler.
+     */
     struct srcsax_handler* getStaticEventHandler(void);
 
     #define ALL_EVENTS_AT_START_DOCUMENT {  \
@@ -77,3 +87,4 @@
         NULL                                \
     }
 #endif
+

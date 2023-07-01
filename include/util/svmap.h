@@ -116,4 +116,10 @@
      * @return 1 if the SVMap is valid, 0 otherwise.
      */
     bool isValid_svmap(SVMap const map);
+
+    /**
+     * @brief Empties an SVMap without freeing.
+     * @param map The SVMap.
+     */
+    void empty_svmap(SVMap* const restrict map);
 #endif
