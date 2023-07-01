@@ -4,7 +4,7 @@
 
     typedef void(*Event)(struct srcsax_context*, ...);
 
-    struct srcsax_handler* registerAllEnabledEvents(void);
+    struct srcsax_handler* getStaticEventHandler(void);
 
     #define ALL_EVENTS_AT_START_DOCUMENT {  \
         NPM_EVENT_AT_START_DOCUMENT,        \

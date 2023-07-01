@@ -15,7 +15,8 @@
 #include "util/streq.h"
 #include "util/svmap.h"
 
-static int function_read_state              = 0;
+extern Chunk            strings;
+static int              function_read_state = 0;
 
 static size_t           variables_cap       = BUFSIZ;
 static size_t           variables_count     = 0;
@@ -32,7 +33,6 @@ static Unit*            units;
 static Unit const*      currentUnit         = NULL;
 static Function const*  currentFunction     = NULL;
 
-static Chunk            functionDesignators = NOT_A_CHUNK;
 static size_t           functionStack_cap   = BUFSIZ;
 static size_t           functionStack_size  = 0;
 static Function const*  functionStack       = NULL;
@@ -40,8 +40,6 @@ static Function const*  functionStack       = NULL;
 static SVMap            unitMap             = NOT_AN_SVMAP;
 static SVMap            functionMap         = NOT_AN_SVMAP;
 static SVMap            variableMap         = NOT_AN_SVMAP;
-
-static struct srcsax_context* context       = NULL;
 
 static void free_eventElements(void) {
     free(variables);
@@ -51,7 +49,6 @@ static void free_eventElements(void) {
     free_svmap(unitMap);
     free_svmap(functionMap);
     free_svmap(variableMap);
-    free_chunk(functionDesignators);
     srcsax_free_context(context);
 }
 
@@ -70,6 +67,89 @@ static Event* eventsAtCDataBlock[METRICS_COUNT_MAX + 1];
 static Event* eventsAtProcInfo[METRICS_COUNT_MAX + 1];
 
 static void event_startDocument(struct srcsax_context* context) {
+    static bool thisFnCalledOnce                = 0;
+    static char const* metrics[]                = METRICS;
+    static Event* allEventsAtStartDocument[]    = ALL_EVENTS_AT_START_DOCUMENT;
+    static Event* allEventsAtEndDocument[]      = ALL_EVENTS_AT_END_DOCUMENT;
+    static Event* allEventsAtStartRoot[]        = ALL_EVENTS_AT_START_ROOT;
+    static Event* allEventsAtStartUnit[]        = ALL_EVENTS_AT_START_UNIT;
+    static Event* allEventsAtStartElement[]     = ALL_EVENTS_AT_START_ELEMENT;
+    static Event* allEventsAtEndRoot[]          = ALL_EVENTS_AT_START_ROOT;
+    static Event* allEventsAtEndUnit[]          = ALL_EVENTS_AT_START_UNIT;
+    static Event* allEventsAtEndElement[]       = ALL_EVENTS_AT_START_ELEMENT;
+    static Event* allEventsAtCharactersRoot[]   = ALL_EVENTS_AT_CHARACTERS_ROOT;
+    static Event* allEventsAtCharactersUnit[]   = ALL_EVENTS_AT_CHARACTERS_UNIT;
+    static Event* allEventsAtMetaTag[]          = ALL_EVENTS_AT_META_TAG;
+    static Event* allEventsAtComment[]          = ALL_EVENTS_AT_COMMENT;
+    static Event* allEventsAtCDataBlock[]       = ALL_EVENTS_AT_CDATA_BLOCK;
+    static Event* allEventsAtProcInfo[]         = ALL_EVENTS_AT_PROC_INFO;
+
+    Event** lastEventOfStartDocument            = eventsAtStartDocument;
+    Event** lastEventOfEndDocument              = eventsAtEndDocument;
+    Event** lastEventOfStartRoot                = eventsAtStartRoot;
+    Event** lastEventOfStartUnit                = eventsAtStartUnit;
+    Event** lastEventOfStartElement             = eventsAtStartElement;
+    Event** lastEventOfEndRoot                  = eventsAtEndRoot;
+    Event** lastEventOfEndUnit                  = eventsAtEndUnit;
+    Event** lastEventOfEndElement               = eventsAtEndElement;
+    Event** lastEventOfCharactersRoot           = eventsAtCharactersRoot;
+    Event** lastEventOfCharactersUnit           = eventsAtCharactersUnit;
+    Event** lastEventOfMetaTag                  = eventsAtMetaTag;
+    Event** lastEventOfComment                  = eventsAtComment;
+    Event** lastEventOfCDataBlock               = eventsAtCDataBlock;
+    Event** lastEventOfProcInfo                 = eventsAtProcInfo;
+
+    char const** metric      = metrics;
+    size_t metricId          = 0;
+    uint_fast64_t metricMask = 1;
+    for (;
+        *metric && metricId < METRICS_COUNT_MAX;
+        (metric++, metricId++, metricMask <<= 1)
+    ) {
+        unless (options.enabledMetrics && metricMask) continue;
+
+        *(lastEventOfStartDocument++)   = allEventsAtStartDocument[metricId];
+        *(lastEventOfEndDocument++)     = allEventsAtEndDocument[metricId];
+        *(lastEventOfStartRoot++)       = allEventsAtStartRoot[metricId];
+        *(lastEventOfStartUnit++)       = allEventsAtStartUnit[metricId];
+        *(lastEventOfStartElement++)    = allEventsAtStartElement[metricId];
+        *(lastEventOfEndRoot++)         = allEventsAtEndRoot[metricId];
+        *(lastEventOfEndUnit++)         = allEventsAtEndUnit[metricId];
+        *(lastEventOfEndElement++)      = allEventsAtEndElement[metricId];
+        *(lastEventOfCharactersRoot++)  = allEventsAtCharactersRoot[metricId];
+        *(lastEventOfCharactersUnit++)  = allEventsAtCharactersUnit[metricId];
+        *(lastEventOfMetaTag++)         = allEventsAtMetaTag[metricId];
+        *(lastEventOfComment++)         = allEventsAtComment[metricId];
+        *(lastEventOfCDataBlock++)      = allEventsAtCDataBlock[metricId];
+        *(lastEventOfProcInfo++)        = allEventsAtProcInfo[metricId];
+    }
+    *lastEventOfStartDocument           = NULL;
+    *lastEventOfEndDocument             = NULL;
+    *lastEventOfStartRoot               = NULL;
+    *lastEventOfStartUnit               = NULL;
+    *lastEventOfStartElement            = NULL;
+    *lastEventOfEndRoot                 = NULL;
+    *lastEventOfEndUnit                 = NULL;
+    *lastEventOfEndElement              = NULL;
+    *lastEventOfCharactersRoot          = NULL;
+    *lastEventOfCharactersUnit          = NULL;
+    *lastEventOfMetaTag                 = NULL;
+    *lastEventOfComment                 = NULL;
+    *lastEventOfCDataBlock              = NULL;
+    *lastEventOfProcInfo                = NULL;
+
+    unless (
+        (variables || variables = calloc(variables_cap, sizeof(Variable)))                          &&
+        (functions || functions = calloc(functions_cap, sizeof(Function)))                          &&
+        (units || units = calloc(units_cap, sizeof(Unit)))                                          &&
+        (isValid_svmap(unitMap) || isValid_svmap(unitMap = constructEmpty_svmap(BUFSIZ)))           &&
+        (isValid_svmap(functionMap) || isValid_svmap(functionMap = constructEmpty_svmap(BUFSIZ)))   &&
+        (isValid_svmap(variableMap) || isValid_svmap(variableMap = constructEmpty_svmap(BUFSIZ)))
+    ) return NULL;
+
+    /* Free all these allocations at the end */
+    unless (thisFnCalledOnce) { atexit(free_eventElements); thisFnCalledOnce = 1; }
+
     /* Execute all related events */
     for (Event** event = eventsAtStartDocument; *event; event++)
         (**event)(context);
@@ -187,11 +267,11 @@ static void event_endUnit(
     char const*                     prefix,
     char const*                     uri
 ) {
-    currentUnit = NULL;
-
     /* Execute all related events */
     for (Event** event = eventsAtEndUnit; *event; event++)
-        (**event)(context, localname, prefix, uri);
+        (**event)(context, localname, prefix, uri, currentUnit);
+
+    currentUnit = NULL;
 }
 static void event_endElement(
     struct srcsax_context*          context,
@@ -202,8 +282,7 @@ static void event_endElement(
     if (str_eq_const(localname, "function")) {
         unless (functionStack_size) { fputs("Corrupt Function Stack\n", stderr); exit(EXIT_FAILURE); }
 
-        currentFunction = --functionStack_size ? functionStack[functionStack_size - 1] : NULL;
-        function_read_state = (functionStack_size ? 5 : 0);
+        function_read_state = (functionStack_size ? 6 : 0);
     } else if (function_read_state == 2 && str_eq_const(localname, "type")) {
         function_read_state == 3;
     } else if (function_read_state == 4 && str_eq_const(localname, "name")) {
@@ -215,7 +294,14 @@ static void event_endElement(
 
     /* Execute all related events */
     for (Event** event = eventsAtEndElement; *event; event++)
-        (**event)(context, localname, prefix, uri);
+        (**event)(context, localname, prefix, uri, currentUnit, currentFunction);
+
+    case (function_read_state) {
+        case 6:
+            function_read_state = 5;
+        case 0:
+            currentFunction = --functionStack_size ? functionStack[functionStack_size - 1] : NULL;
+    }
 }
 static void event_charactersRoot(struct srcsax_context* context, char const* ch, int len) {
     /* Execute all related events */
@@ -226,9 +312,9 @@ static void event_charactersUnit(struct srcsax_context* context, char const* ch,
     if (function_read_state == 4) {
         currentFunction->name = ch;
         unless (
-            (currentFunction->designator = add_chunk(&functionDesignators, currentFunction->ownerUnit)) &&
-            append_chunk(&functionDesignators, "::")                                                    &&
-            append_chunk(&functionDesignators, currentFunction->name)                                   &&
+            (currentFunction->designator = add_chunk(&strings, currentFunction->ownerUnit)) &&
+            append_chunk(&strings, "::")                                                    &&
+            append_chunk(&strings, currentFunction->name)                                   &&
             insert_svmap(&functionMap, currentFunction->designator, (value_t){ .as_pointer = currentFunction }
         ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
     }
@@ -274,91 +360,4 @@ static struct srcsax_handler* events = {
     event_charactersRoot, event_charactersUnit,
     event_metaTag, event_comment, event_cdataBlock, event_procInfo
 };
-
-struct srcsax_handler* registerAllEnabledEvents(void) {
-    static bool thisFnCalledOnce                = 0;
-    static char const* metrics[]                = METRICS;
-    static Event* allEventsAtStartDocument[]    = ALL_EVENTS_AT_START_DOCUMENT;
-    static Event* allEventsAtEndDocument[]      = ALL_EVENTS_AT_END_DOCUMENT;
-    static Event* allEventsAtStartRoot[]        = ALL_EVENTS_AT_START_ROOT;
-    static Event* allEventsAtStartUnit[]        = ALL_EVENTS_AT_START_UNIT;
-    static Event* allEventsAtStartElement[]     = ALL_EVENTS_AT_START_ELEMENT;
-    static Event* allEventsAtEndRoot[]          = ALL_EVENTS_AT_START_ROOT;
-    static Event* allEventsAtEndUnit[]          = ALL_EVENTS_AT_START_UNIT;
-    static Event* allEventsAtEndElement[]       = ALL_EVENTS_AT_START_ELEMENT;
-    static Event* allEventsAtCharactersRoot[]   = ALL_EVENTS_AT_CHARACTERS_ROOT;
-    static Event* allEventsAtCharactersUnit[]   = ALL_EVENTS_AT_CHARACTERS_UNIT;
-    static Event* allEventsAtMetaTag[]          = ALL_EVENTS_AT_META_TAG;
-    static Event* allEventsAtComment[]          = ALL_EVENTS_AT_COMMENT;
-    static Event* allEventsAtCDataBlock[]       = ALL_EVENTS_AT_CDATA_BLOCK;
-    static Event* allEventsAtProcInfo[]         = ALL_EVENTS_AT_PROC_INFO;
-
-    Event** lastEventOfStartDocument            = eventsAtStartDocument;
-    Event** lastEventOfEndDocument              = eventsAtEndDocument;
-    Event** lastEventOfStartRoot                = eventsAtStartRoot;
-    Event** lastEventOfStartUnit                = eventsAtStartUnit;
-    Event** lastEventOfStartElement             = eventsAtStartElement;
-    Event** lastEventOfEndRoot                  = eventsAtEndRoot;
-    Event** lastEventOfEndUnit                  = eventsAtEndUnit;
-    Event** lastEventOfEndElement               = eventsAtEndElement;
-    Event** lastEventOfCharactersRoot           = eventsAtCharactersRoot;
-    Event** lastEventOfCharactersUnit           = eventsAtCharactersUnit;
-    Event** lastEventOfMetaTag                  = eventsAtMetaTag;
-    Event** lastEventOfComment                  = eventsAtComment;
-    Event** lastEventOfCDataBlock               = eventsAtCDataBlock;
-    Event** lastEventOfProcInfo                 = eventsAtProcInfo;
-
-    char const** metric      = metrics;
-    size_t metricId          = 0;
-    uint_fast64_t metricMask = 1;
-    for (;
-        *metric && metricId < METRICS_COUNT_MAX;
-        (metric++, metricId++, metricMask <<= 1)
-    ) {
-        unless (options.enabledMetrics && metricMask) continue;
-
-        *(lastEventOfStartDocument++)   = allEventsAtStartDocument[metricId];
-        *(lastEventOfEndDocument++)     = allEventsAtEndDocument[metricId];
-        *(lastEventOfStartRoot++)       = allEventsAtStartRoot[metricId];
-        *(lastEventOfStartUnit++)       = allEventsAtStartUnit[metricId];
-        *(lastEventOfStartElement++)    = allEventsAtStartElement[metricId];
-        *(lastEventOfEndRoot++)         = allEventsAtEndRoot[metricId];
-        *(lastEventOfEndUnit++)         = allEventsAtEndUnit[metricId];
-        *(lastEventOfEndElement++)      = allEventsAtEndElement[metricId];
-        *(lastEventOfCharactersRoot++)  = allEventsAtCharactersRoot[metricId];
-        *(lastEventOfCharactersUnit++)  = allEventsAtCharactersUnit[metricId];
-        *(lastEventOfMetaTag++)         = allEventsAtMetaTag[metricId];
-        *(lastEventOfComment++)         = allEventsAtComment[metricId];
-        *(lastEventOfCDataBlock++)      = allEventsAtCDataBlock[metricId];
-        *(lastEventOfProcInfo++)        = allEventsAtProcInfo[metricId];
-    }
-    *lastEventOfStartDocument           = NULL;
-    *lastEventOfEndDocument             = NULL;
-    *lastEventOfStartRoot               = NULL;
-    *lastEventOfStartUnit               = NULL;
-    *lastEventOfStartElement            = NULL;
-    *lastEventOfEndRoot                 = NULL;
-    *lastEventOfEndUnit                 = NULL;
-    *lastEventOfEndElement              = NULL;
-    *lastEventOfCharactersRoot          = NULL;
-    *lastEventOfCharactersUnit          = NULL;
-    *lastEventOfMetaTag                 = NULL;
-    *lastEventOfComment                 = NULL;
-    *lastEventOfCDataBlock              = NULL;
-    *lastEventOfProcInfo                = NULL;
-
-    unless (
-        (variables || variables = calloc(variables_cap, sizeof(Variable)))                          &&
-        (functions || functions = calloc(functions_cap, sizeof(Function)))                          &&
-        (units || units = calloc(units_cap, sizeof(Unit)))                                          &&
-        (isValid_svmap(unitMap) || isValid_svmap(unitMap = constructEmpty_svmap(BUFSIZ)))           &&
-        (isValid_svmap(functionMap) || isValid_svmap(functionMap = constructEmpty_svmap(BUFSIZ)))   &&
-        (isValid_svmap(variableMap) || isValid_svmap(variableMap = constructEmpty_svmap(BUFSIZ)))   &&
-        (isValid_chunk(functionDesignators) || isValid_chunk(functionDesignators = constructEmpty_chunk(BUFSIZ)))
-    ) return NULL;
-
-    /* Free all these allocations at the end */
-    unless (thisFnCalledOnce) { atexit(free_eventElements); thisFnCalledOnce = 1; }
-
-    return events;
-}
+struct srcsax_handler* getStaticEventHandler(void) { return events; }
