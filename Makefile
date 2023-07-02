@@ -4,7 +4,7 @@ VERSION_SRCMETRICS=0.0.1
 CCARGS=-std=c99 -DVERSION_SRCMETRICS=\"${VERSION_SRCMETRICS}\" -Weverything
 CC=clang
 COVARGS=--coverage -fprofile-arcs -ftest-coverage
-CFILES=src/util/*.c src/srcmetrics/*.c
+CFILES=src/util/*.c src/srcmetrics/*.c src/srcmetrics/metrics/*.c
 INCLUDES=-Iinclude
 LIBRARIES=-lsrcml -lsrcsax
 DEBUGFLAGS=-g

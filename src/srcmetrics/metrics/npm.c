@@ -23,7 +23,7 @@ static SVMap            npm_statistics = NOT_AN_SVMAP;
 static value_t_unsigned npm_overall;
 static value_t_unsigned npm_currentUnit;
 
-static free_npm_statistics(void) { free_svmap(npm_statistics); }
+static void free_npm_statistics(void) { free_svmap(npm_statistics); }
 
 void event_startDocument_npm(struct srcsax_context* context, ...) {
     unless (
@@ -46,19 +46,19 @@ void event_startUnit_npm(struct srcsax_context* context, ...) {
 }
 
 void event_endUnit_npm(struct srcsax_context* context, ...) {
-    char const* currentUnit;
+    Unit const* currentUnit;
     char const* npmKey;
     va_list args;
 
     va_start(args, context);
     /* Unused variables: localname, prefix, uri. */
     repeat (3) va_arg(args, char const*);
-    currentUnit = va_arg(args, char const*);
+    currentUnit = va_arg(args, Unit const*);
     va_end(args);
 
     unless (
-        (npmKey = add_chunk(&strings, "NPM_"))  &&
-        append_chunk(&strings, currentUnit)     &&
+        (npmKey = add_chunk(&strings, "NPM_", 4))                               &&
+        append_chunk(&strings, currentUnit->name, strlen(currentUnit->name))    &&
         insert_svmap(&npm_statistics, npmKey, VAL_UNSIGNED(npm_currentUnit))
     ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
 }
@@ -83,6 +83,13 @@ void event_startElement_npm(struct srcsax_context* context, ...) {
 }
 
 void event_endElement_npm(struct srcsax_context* context, ...) {
+    char const* localname;
+    va_list args;
+
+    va_start(args, context);
+    localname = va_arg(args, char const*);
+    va_end(args);
+
     switch (npm_read_state) {
         case 2:
             if (str_eq_const(localname, "type")) npm_read_state = 0;

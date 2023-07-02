@@ -534,7 +534,7 @@ int main(int argc, char* argv[]) {
         /* Free the archive */
         srcml_archive_free(archive);
 
-        fprintf(stderr, "archiveBufferSize = %zu bytes\n", archiveBufferSize);
+        fprintf(stderr, "archiveBufferSize = %zu bytes\n\n", archiveBufferSize);
 
         /* Second Task: Do srcsax stuff on the archive */
         {

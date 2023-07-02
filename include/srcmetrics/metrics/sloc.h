@@ -21,7 +21,7 @@
     #define SLOC_EVENT_AT_END_DOCUMENT      &event_endDocument_sloc
     #define SLOC_EVENT_AT_START_ROOT        NULL
     #define SLOC_EVENT_AT_START_UNIT        &event_startUnit_sloc
-    #define SLOC_EVENT_AT_START_ELEMENT     NULL
+    #define SLOC_EVENT_AT_START_ELEMENT     &event_startElement_sloc
     #define SLOC_EVENT_AT_END_ROOT          NULL
     #define SLOC_EVENT_AT_END_UNIT          &event_endUnit_sloc
     #define SLOC_EVENT_AT_END_ELEMENT       &event_endElement_sloc

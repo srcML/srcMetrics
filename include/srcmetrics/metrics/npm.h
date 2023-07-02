@@ -22,7 +22,7 @@
     #define NPM_EVENT_AT_END_DOCUMENT       &event_endDocument_npm
     #define NPM_EVENT_AT_START_ROOT         NULL
     #define NPM_EVENT_AT_START_UNIT         &event_startUnit_npm
-    #define NPM_EVENT_AT_START_ELEMENT      NULL
+    #define NPM_EVENT_AT_START_ELEMENT      &event_startElement_npm
     #define NPM_EVENT_AT_END_ROOT           NULL
     #define NPM_EVENT_AT_END_UNIT           &event_endUnit_npm
     #define NPM_EVENT_AT_END_ELEMENT        &event_endElement_npm
