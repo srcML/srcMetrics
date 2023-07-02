@@ -496,8 +496,6 @@ int main(int argc, char* argv[]) {
                 struct srcml_unit* unit = srcml_unit_create(archive);
                 /* NOTE: I assume every file contains exactly one unit. This is true for C but maybe not for Java */
 
-                fprintf(stderr, "INFILE = %s\n\n", *infile);
-
                 /* Open the input source code */
                 if ((srcml_fd = open(*infile, O_RDONLY, 0)) == -1) { fprintf(stderr, "Could NOT open %s\n", *infile); return EXIT_FAILURE; }
 
@@ -514,6 +512,9 @@ int main(int argc, char* argv[]) {
 
                 /* Set language to C */
                 unless (srcml_unit_set_language(unit, SRCML_LANGUAGE_C) == SRCML_STATUS_OK) { fputs("Cannot set language\n", stderr); return EXIT_FAILURE; }
+
+                /* Set filename */
+                unless (srcml_unit_set_filename(unit, *infile) == SRCML_STATUS_OK) { fputs("Cannot set file\n", stderr); return EXIT_FAILURE; }
 
                 /* Create the unit */
                 unless (srcml_unit_parse_memory(unit, unitBuffer, (size_t)nBytes) == SRCML_STATUS_OK) { fputs("Cannot parse unit\n", stderr); return EXIT_FAILURE; }

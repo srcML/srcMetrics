@@ -44,8 +44,6 @@ static SVMap        unitMap             = NOT_AN_SVMAP;
 static SVMap        functionMap         = NOT_AN_SVMAP;
 static SVMap        variableMap         = NOT_AN_SVMAP;
 
-static Unit         dummyUnit           = { "UnknownUnit" };
-
 static void free_eventElements(void) {
     free(variables);
     free(functions);
@@ -221,11 +219,12 @@ static void event_startUnit(
 
     currentUnit = NULL;
     for (struct srcsax_attribute const* attribute = attributes + num_attributes - 1; attribute >= attributes; attribute--) {
-        /* fprintf(stderr, "%s => %s\n", attribute->localname, attribute->value); */
         unless (str_eq_const(attribute->localname, "filename")) continue;
-        *(currentUnit = units + units_count++) = (Unit){ attribute->value };
+        currentUnit = units + units_count++;
+        unless ((currentUnit->name = add_chunk(&strings, attribute->value, strlen(attribute->value))))
+            { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); };
     }
-    unless (currentUnit) { currentUnit = &dummyUnit; }
+    unless (currentUnit) { fputs("PARSE_ERROR\n", stderr); exit(EXIT_FAILURE); }
 
     unless (insert_svmap(&unitMap, localname, VAL_POINTER(currentUnit)))
         { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
