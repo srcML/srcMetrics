@@ -128,7 +128,7 @@ void event_startElement_sloc(struct srcsax_context* context, ...) {
                 sloc_overall++;
                 sloc_currentFunction++;
         }
-    } else if (str_eq_const(localname, "include")) {
+    } else if (str_eq_const(localname, "directive")) {
         switch (sloc_state) {
             case 1U:
                 sloc_currentUnit++;
@@ -152,7 +152,7 @@ void event_endElement_sloc(struct srcsax_context* context, ...) {
     va_end(args);
 
     switch (sloc_state) {
-        case 7U:    if (str_eq_const(localname, "include"))     sloc_state = 1U; break;
+        case 7U:    if (str_eq_const(localname, "directive"))   sloc_state = 1U; break;
         case 6U:    if (str_eq_const(localname, "macro"))       sloc_state = 2U; break;
         case 5U:    if (str_eq_const(localname, "macro"))       sloc_state = 1U; break;
         case 4U:    if (
