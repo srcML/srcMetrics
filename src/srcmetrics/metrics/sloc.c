@@ -124,8 +124,8 @@ void event_startElement_sloc(struct srcsax_context* context, ...) {
     ) {
         switch (sloc_state) {
             case 2U:
-                sloc_currentUnit++;
                 sloc_overall++;
+                sloc_currentUnit++;
                 sloc_currentFunction++;
         }
     } else if (str_eq_const(localname, "directive")) {
@@ -134,6 +134,12 @@ void event_startElement_sloc(struct srcsax_context* context, ...) {
                 sloc_currentUnit++;
                 sloc_overall++;
                 sloc_state = 7U;
+                break;
+            case 2U:
+                sloc_overall++;
+                sloc_currentUnit++;
+                sloc_currentFunction++;
+                sloc_state = 8U;
         }
     }
 }
@@ -152,6 +158,7 @@ void event_endElement_sloc(struct srcsax_context* context, ...) {
     va_end(args);
 
     switch (sloc_state) {
+        case 8U:    if (str_eq_const(localname, "directive"))   sloc_state = 2U; break;
         case 7U:    if (str_eq_const(localname, "directive"))   sloc_state = 1U; break;
         case 6U:    if (str_eq_const(localname, "macro"))       sloc_state = 2U; break;
         case 5U:    if (str_eq_const(localname, "macro"))       sloc_state = 1U; break;
