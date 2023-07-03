@@ -112,8 +112,8 @@ void event_charactersUnit_npm(struct srcsax_context* context, ...) {
 
     if (npm_read_state == 3 && str_eq_const(ch, "static")) {
         npm_read_state = 0;
-        npm_overall--;
-        npm_currentUnit--;
+        npm_overall -= !!npm_overall;
+        npm_currentUnit -= !!npm_currentUnit;
     }
 }
 
