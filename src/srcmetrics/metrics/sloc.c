@@ -15,9 +15,11 @@
 #include "util/streq.h"
 #include "util/unless.h"
 
-#define ENTRY_COUNT_GUESS   (UNIT_COUNT_GUESS + FN_COUNT_GUESS + VAR_COUNT_GUESS)
+#define ENTRY_COUNT_GUESS   (UNIT_COUNT_GUESS + FN_COUNT_GUESS)
 
 static SVMap            sloc_statistics = NOT_AN_SVMAP;
+
+static unsigned         sloc_state = 0U;
 
 static value_t_unsigned sloc_overall;
 static value_t_unsigned sloc_currentUnit;
@@ -35,6 +37,7 @@ void event_startDocument_sloc(struct srcsax_context* context, ...) {
 
     atexit(free_sloc_statistics);
     sloc_overall = 0;
+    sloc_state = 0U;
 }
 
 void event_endDocument_sloc(struct srcsax_context* context, ...) {
@@ -45,6 +48,7 @@ void event_endDocument_sloc(struct srcsax_context* context, ...) {
 
 void event_startUnit_sloc(struct srcsax_context* context, ...) {
     sloc_currentUnit = 0;
+    sloc_state = 1U;
 }
 
 void event_endUnit_sloc(struct srcsax_context* context, ...) {
@@ -63,6 +67,8 @@ void event_endUnit_sloc(struct srcsax_context* context, ...) {
         append_chunk(&strings, currentUnit->name, strlen(currentUnit->name))    &&
         insert_svmap(&sloc_statistics, slocKey, VAL_UNSIGNED(sloc_currentUnit))
     ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
+
+    sloc_state = 0U;
 }
 
 void event_startElement_sloc(struct srcsax_context* context, ...) {
@@ -74,15 +80,49 @@ void event_startElement_sloc(struct srcsax_context* context, ...) {
     va_end(args);
 
     if (str_eq_const(localname, "function")) {
-        sloc_currentFunction = 0;
-    } else if (
+        sloc_overall++;
+        sloc_currentUnit++;
+        sloc_currentFunction = 1;
+        sloc_state = 2U;
+    }
+
+    if (
         str_eq_const(localname, "expr_stmt") ||
         str_eq_const(localname, "decl_stmt") ||
         str_eq_const(localname, "return")
     ) {
-        sloc_overall++;
-        sloc_currentUnit++;
-        sloc_currentFunction++;
+        switch (sloc_state) {
+            case 1U:
+                sloc_currentUnit++;
+                sloc_overall++;
+                sloc_state = 3U;
+                break;
+            case 2U:
+                sloc_currentUnit++;
+                sloc_overall++;
+                sloc_currentFunction++;
+                sloc_state = 4U;
+        }
+    } else if (str_eq_const(localname, "macro")) {
+        switch (sloc_state) {
+            case 1U:
+                sloc_currentUnit++;
+                sloc_overall++;
+                sloc_state = 5U;
+                break;
+            case 2U:
+                sloc_currentFunction++;
+                sloc_currentUnit++;
+                sloc_overall++;
+                sloc_state = 6U;
+        }
+    } else if (str_eq_const(localname, "cpp:include")) {
+        switch (sloc_state) {
+            case 1U:
+                sloc_currentUnit++;
+                sloc_overall++;
+                sloc_state = 7U;
+        }
     }
 }
 
@@ -99,8 +139,25 @@ void event_endElement_sloc(struct srcsax_context* context, ...) {
     currentFunction = va_arg(args, Function const*);
     va_end(args);
 
+    switch (sloc_state) {
+        case 7U:    if (str_eq_const(localname, "cpp:include")) sloc_state = 1U; break;
+        case 6U:    if (str_eq_const(localname, "macro"))       sloc_state = 2U; break;
+        case 5U:    if (str_eq_const(localname, "macro"))       sloc_state = 1U; break;
+        case 4U:    if (
+                        str_eq_const(localname, "expr_stmt") ||
+                        str_eq_const(localname, "decl_stmt") ||
+                        str_eq_const(localname, "return")
+                    )                                           sloc_state = 2U; break;
+        case 3U:    if (
+                        str_eq_const(localname, "expr_stmt") ||
+                        str_eq_const(localname, "decl_stmt") ||
+                        str_eq_const(localname, "return")
+                    )                                           sloc_state = 1U; break;
+    }
+
     unless (str_eq_const(localname, "function")) return;
 
+    sloc_state = 1U;
     unless (
         (slocKey = add_chunk(&strings, "SLOC_", 5))                                                 &&
         append_chunk(&strings, currentFunction->designator, strlen(currentFunction->designator))    &&

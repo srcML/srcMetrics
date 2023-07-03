@@ -505,8 +505,6 @@ int main(int argc, char* argv[]) {
                 /* Just a size check */
                 if (nBytes >= 131070) { fprintf(stderr, "%s is too big to read (%zu bytes)\n", *infile, (size_t)nBytes); return EXIT_FAILURE; }
 
-                fprintf(stderr, "Just read %zu bytes\n", (size_t)nBytes);
-
                 /* Close the file */
                 if (close(srcml_fd) == -1) { fprintf(stderr, "Cannot close %s\n", *infile); return EXIT_FAILURE; }
 
@@ -534,8 +532,6 @@ int main(int argc, char* argv[]) {
 
         /* Free the archive */
         srcml_archive_free(archive);
-
-        fprintf(stderr, "archiveBufferSize = %zu bytes\n\n", archiveBufferSize);
 
         /* Second Task: Do srcsax stuff on the archive */
         {

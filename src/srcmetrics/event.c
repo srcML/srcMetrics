@@ -339,6 +339,7 @@ static void event_charactersUnit(struct srcsax_context* context, char const* ch,
             (currentFunction->designator = add_chunk(&strings, currentFunction->ownerUnit, strlen(currentFunction->ownerUnit))) &&
             append_chunk(&strings, "::", 2)                                                                                     &&
             (currentFunction->name = append_chunk(&strings, ch, (size_t)len))                                                   &&
+            append_chunk(&strings, "()", 2)                                                                                     &&
             insert_svmap(&functionMap, currentFunction->designator, VAL_POINTER(currentFunction))
         ) { fputs("MEMORY_ERROR\n", stderr); exit(EXIT_FAILURE); }
     }
