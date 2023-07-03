@@ -183,7 +183,13 @@ void event_endElement_sloc(struct srcsax_context* context, ...) {
         case 3U:    if (
                         str_eq_const(localname, "expr_stmt")    ||
                         str_eq_const(localname, "decl_stmt")    ||
-                        str_eq_const(localname, "return")
+                        str_eq_const(localname, "return")       ||
+                        str_eq_const(localname, "break")        ||
+                        str_eq_const(localname, "continue")     ||
+                        str_eq_const(localname, "label")        ||
+                        str_eq_const(localname, "goto")         ||
+                        str_eq_const(localname, "default")      ||
+                        str_eq_const(localname, "case")
                     )                                           sloc_state = 1U;
     }
 
