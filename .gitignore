@@ -54,6 +54,15 @@ latex/**
 *.gcda
 *.gcov
 
+# Program outputs
+*.csv
+*.xml
+*.dot
+*.cg.dot
+*.cg.xml
+*.cfg.dot
+*.cfg.xml
+
 # Kernel Module Compile Results
 *.mod*
 *.cmd
