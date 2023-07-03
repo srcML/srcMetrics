@@ -89,7 +89,9 @@ void event_startElement_sloc(struct srcsax_context* context, ...) {
         str_eq_const(localname, "decl_stmt")    ||
         str_eq_const(localname, "return")       ||
         str_eq_const(localname, "break")        ||
-        str_eq_const(localname, "continue")
+        str_eq_const(localname, "continue")     ||
+        str_eq_const(localname, "label")        ||
+        str_eq_const(localname, "goto")
     ) {
         switch (sloc_state) {
             case 1U:
@@ -120,7 +122,10 @@ void event_startElement_sloc(struct srcsax_context* context, ...) {
         str_eq_const(localname, "for")      ||
         str_eq_const(localname, "while")    ||
         str_eq_const(localname, "switch")   ||
-        str_eq_const(localname, "if_stmt")
+        str_eq_const(localname, "if_stmt")  ||
+        str_eq_const(localname, "typedef")  ||
+        str_eq_const(localname, "struct")   ||
+        str_eq_const(localname, "union")
     ) {
         switch (sloc_state) {
             case 2U:
@@ -167,13 +172,15 @@ void event_endElement_sloc(struct srcsax_context* context, ...) {
                         str_eq_const(localname, "decl_stmt") ||
                         str_eq_const(localname, "return")    ||
                         str_eq_const(localname, "break")     ||
-                        str_eq_const(localname, "continue")
+                        str_eq_const(localname, "continue")  ||
+                        str_eq_const(localname, "label")     ||
+                        str_eq_const(localname, "goto")
                     )                                           sloc_state = 2U; break;
         case 3U:    if (
                         str_eq_const(localname, "expr_stmt") ||
                         str_eq_const(localname, "decl_stmt") ||
                         str_eq_const(localname, "return")
-                    )                                           sloc_state = 1U; break;
+                    )                                           sloc_state = 1U;
     }
 
     unless (str_eq_const(localname, "function")) return;
