@@ -84,12 +84,12 @@ void event_startElement_sloc(struct srcsax_context* context, ...) {
         sloc_currentUnit++;
         sloc_currentFunction = 1;
         sloc_state = 2U;
-    }
-
-    if (
-        str_eq_const(localname, "expr_stmt") ||
-        str_eq_const(localname, "decl_stmt") ||
-        str_eq_const(localname, "return")
+    } else if (
+        str_eq_const(localname, "expr_stmt")    ||
+        str_eq_const(localname, "decl_stmt")    ||
+        str_eq_const(localname, "return")       ||
+        str_eq_const(localname, "break")        ||
+        str_eq_const(localname, "continue")
     ) {
         switch (sloc_state) {
             case 1U:
@@ -116,7 +116,19 @@ void event_startElement_sloc(struct srcsax_context* context, ...) {
                 sloc_overall++;
                 sloc_state = 6U;
         }
-    } else if (str_eq_const(localname, "cpp:include")) {
+    } else if (
+        str_eq_const(localname, "for")      ||
+        str_eq_const(localname, "while")    ||
+        str_eq_const(localname, "switch")   ||
+        str_eq_const(localname, "if_stmt")
+    ) {
+        switch (sloc_state) {
+            case 2U:
+                sloc_currentUnit++;
+                sloc_overall++;
+                sloc_currentFunction++;
+        }
+    } else if (str_eq_const(localname, "include")) {
         switch (sloc_state) {
             case 1U:
                 sloc_currentUnit++;
@@ -140,13 +152,15 @@ void event_endElement_sloc(struct srcsax_context* context, ...) {
     va_end(args);
 
     switch (sloc_state) {
-        case 7U:    if (str_eq_const(localname, "cpp:include")) sloc_state = 1U; break;
+        case 7U:    if (str_eq_const(localname, "include"))     sloc_state = 1U; break;
         case 6U:    if (str_eq_const(localname, "macro"))       sloc_state = 2U; break;
         case 5U:    if (str_eq_const(localname, "macro"))       sloc_state = 1U; break;
         case 4U:    if (
                         str_eq_const(localname, "expr_stmt") ||
                         str_eq_const(localname, "decl_stmt") ||
-                        str_eq_const(localname, "return")
+                        str_eq_const(localname, "return")    ||
+                        str_eq_const(localname, "break")     ||
+                        str_eq_const(localname, "continue")
                     )                                           sloc_state = 2U; break;
         case 3U:    if (
                         str_eq_const(localname, "expr_stmt") ||
