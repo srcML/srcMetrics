@@ -27,26 +27,20 @@
  * * Obtaining static metrics from the source code and its control-flow/call graphs.
  */
 #include <ctype.h>
-#include <fcntl.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <unistd.h>
 
-#include "libsrcml/srcml.h"
+#include "padkit/chunk.h"
+#include "padkit/csv.h"
+#include "padkit/reallocate.h"
+#include "padkit/streq.h"
+#include "srcmetrics.h"
 #include "srcmetrics/event.h"
 #include "srcmetrics/metrics.h"
-#include "srcmetrics/options.h"
 #include "srcmetrics/report.h"
-#include "util/csv.h"
-#include "util/readfile.h"
-#include "util/streq.h"
-#include "util/unless.h"
-#include "util/until.h"
 
-char const* csv_delimeter   = CSV_INITIAL_DELIMETER;
-char const* csv_row_end     = CSV_INITIAL_ROW_END;
-Chunk strings               = NOT_A_CHUNK;
-struct Options options;
+char const* csv_delimeter = CSV_INITIAL_DELIMETER;
+char const* csv_row_end   = CSV_INITIAL_ROW_END;
+struct Options options    = OPTIONS_INITIAL;
+Chunk strings[1]          = { NOT_A_CHUNK };
 
 /**
  * @defgroup atexit_Functions Functions Called @ Exit
@@ -54,23 +48,21 @@ struct Options options;
  */
 
 /**
- * @brief Puts a final newline to the standard error before termination.
- *
- * Putting a newline into a standard buffer may ensure a final flush in some systems.
- * Also, it looks nice on a terminal window.
+ * @brief Frees the global strings Chunk.
  */
-static void putFinalNewLine(void)   { fputs("\n", stderr); }
+static void free_strings(void) {
+    DEBUG_ABORT_IF(!free_chunk(strings))
+    NDEBUG_EXECUTE(free_chunk(strings))
+}
 
 /**
  * @brief Frees the infiles array from the options.
- * @see Options::infiles
  */
-static void free_infiles(void)      { free(options.infiles); }
-
-/**
- * @brief Whatever string main() allocated, free them.
- */
-static void free_strings(void)      { free_chunk(strings); }
+static void free_infiles(void) {
+    DEBUG_ABORT_IF(!options.cmd_infiles)
+    free(options.cmd_infiles);
+    options.cmd_infiles = NULL;
+}
 
 /**@}*/
 
@@ -80,73 +72,213 @@ static void free_strings(void)      { free_chunk(strings); }
  */
 
 /**
+ * @brief Prints a bare short option error.
+ */
+static void showBareShortOptionError(void) {
+    fputs("\n"
+          "Unrecognized bare option '-'.\n"
+          "\n"
+          "Execute `srcmetrics --help` for more information.\n"
+          "\n", stderr);
+}
+
+/**
  * @brief Prints the copyright message.
  */
-static void showCopyrightMessage(void) {
-    fputs("Copyright (C) 2023 srcML, LLC. (www.srcML.org)\n", stderr);
+static void showCopyright(void) {
+    fputs("\n"
+          "Copyright (C) 2023 srcML, LLC. (www.srcML.org)\n"
+          "\n", stderr);
+}
+
+/**
+ * @brief Prints an abbreviation-description pair.
+ */
+static void showDescription(char const* const abbreviation, char const* const description) {
+    fprintf(stderr, "%*s: %s\n", 5, abbreviation, description);
+}
+
+/**
+ * @brief Prints a 'file-NOT-found' error.
+ */
+static void showFileNOTFoundError(char const* const filepath) {
+    fprintf(stderr, "\n"
+                    "File '%s' is NOT found\n"
+                    "\n", filepath);
+}
+
+/**
+ * @brief Prints a short option 'must-be-alone' error.
+ */
+static void showLongOptionMustBeAloneError(char const* const option_str) {
+    fprintf(stderr, "\n"
+                    "Long option '%s' must NOT be used with any other option.\n"
+                    "\n"
+                    "Execute `srcmetrics --help` for more information.\n"
+                    "\n", option_str);
+}
+
+/**
+ * @brief Prints a lomg option 'needs-parameters' error.
+ */
+static void showLongOptionNeedsParametersError(char const* const option_str) {
+    fprintf(stderr, "\n"
+                    "Short option '%s' must be followed with parameter(s).\n"
+                    "\n"
+                    "Execute `srcmetrics --help` for more information.\n"
+                    "\n", option_str);
 }
 
 /**
  * @brief Prints the long help message.
  */
 static void showLongHelpMessage(void) {
-    fputs("Usage: srcmetrics [options] <src_infile>... [-o <srcMetrics_outfile>]\n", stderr);
-    fputs("       srcmetrics [options] <srcML_infile>... [-o <srcMetrics_outfile>]\n", stderr);
-    fputs("       srcmetrics [options] <srcGraph_infile>... [-o <srcMetrics_outfile>]\n", stderr);
-    fputs("\n", stderr);
-    fputs("Calculates static metrics from C source code, srcML, or srcGraph files\n", stderr);
-    fputs("\n", stderr);
-    fputs("Source-code input can be from standard input, a file, a directory, or an archive file, i.e., tar, cpio, and zip.\n", stderr);
-    fputs("\n", stderr);
-    fputs("GENERAL OPTIONS:\n", stderr);
-    fputs("  -h,--help                  Output this help message and exit\n", stderr);
-    fputs("  -V,--version               Output version number and exit\n", stderr);
-    fputs("  -v,--verbose               Status information to stderr\n", stderr);
-    fputs("  -c,--copyright             Output the copyright message and exit\n", stderr);
-    fputs("  -q,--quiet                 Suppress status messages\n", stderr);
-    fputs("  -o,--output FILE           Write output to FILE\n", stderr);
-    fputs("  -l,--language LANG         Set the source-code language to C\n", stderr);
-    fputs("  -d,--delimeter DELIM       Change the CSV delimeter, default: ','\n", stderr);
-    fputs("  --files-from FILE          Input source-code filenames from FILE instead of command-line arguments\n", stderr);
-    /*fputs("  --src-encoding ENCODING    Set the input source-code encoding\n", stderr);*/
-    fputs("\n", stderr);
-    fputs("SRCMETRICS:\n", stderr);
-    fputs("  -m,--metric METRIC         Report this METRIC if possible, excludes all unspecified metrics\n", stderr);
-    fputs("  -e,--exclude METRIC        Exclude this METRIC from the output\n", stderr);
-    fputs("  -f,--metrics-from FILE     Input enabled metrics from FILE\n", stderr);
-    fputs("  -x,--excluded-from FILE    Input exclided metrics from FILE\n", stderr);
-    fputs("\n", stderr);
-    fputs("METADATA OPTIONS:\n", stderr);
-    fputs("  -L,--list                  Output the list of supported metrics and exit\n", stderr);
-    fputs("  -s,--show METRIC           Output detailed information on METRIC and exit\n", stderr);
-    fputs("\n", stderr);
-    fputs("Have a question or need to report a bug?\n", stderr);
-    fputs("Contact us at www.srcml.org/support.html\n", stderr);
-    fputs("www.srcML.org\n", stderr);
+    fputs("\n"
+          "Usage: srcmetrics [options] <src_infile>...\n"
+          "\n"
+          "Calculates static metrics from C source code files.\n"
+          "\n"
+          "Source-code input can be from standard input, a file, a directory, or an archive file, i.e., tar, cpio, zip, etc.\n"
+          "\n"
+          "GENERAL OPTIONS:\n"
+          "  -h,--help                      Output this help message and exit\n"
+          "  -V,--version                   Output version number and exit\n"
+          "  -v,--verbose                   Status information to stderr\n"
+          "  -c,--copyright                 Output the copyright message and exit\n"
+          "  -o,--output FILE               Write output to FILE\n"
+          "  -l,--language LANG             Set the source-code language to C\n"
+          "  -d,--delimeter DELIM           Change the CSV delimeter, default: ','\n"
+          "  --files-from FILE              Input source-code filenames from FILE\n"
+          "\n"
+          "SRCMETRICS OPTIONS:\n"
+          "  -a,--all-metrics               (Default) Report all metrics (implies '--RFU-show --CC-show')\n"
+          "  -m,--metric METRIC             Report this METRIC if possible, excludes all unspecified metrics\n"
+          "  -e,--exclude METRIC            Exclude this METRIC from the output\n"
+          "  -f,--metrics-from FILE         Input enabled metrics from FILE\n"
+          "  -x,--excluded-from FILE        Input excluded metrics from FILE\n"
+          "\n"
+          "METADATA OPTIONS:\n"
+          "  -L,--list                      Output the list of supported metrics and exit\n"
+          "  -s,--show METRIC               Output detailed information on METRIC and exit\n"
+          "\n"
+          "GRAPH OPTIONS:\n"
+          "     --graph-enable-dot          (Default) Enables .dot output\n"
+          "     --graph-disable-dot         Disables .dot output\n"
+          "     --graph-enable-xml          (Default) Enables .xml output\n"
+          "     --graph-disable-xml         Disables .xml output\n"
+          "\n"
+          "CALL GRAPH OPTIONS:\n"
+          "     --no-cg                     (Default) Does NOT compute the call graph\n"
+          "     --cg <graph_name>           Computes one overall call graph (implies '-m RFU --RFU-quiet')\n"
+          "     --cg-no-external            (Default) Ignores external calls in the call graph\n"
+          "     --cg-show-external          Shows external calls in the call graph\n"
+          "\n"
+          "CONTROL FLOW GRAPH OPTIONS: \n"
+          "     --no-cfg                    (Default) Does NOT output control flow graphs\n"
+          "     --cfg <graph_name>          Outputs the control flow graph (implies '-m CC --CC-quiet')\n"
+          "     --ipcfg <graph_name>        Outputs the inter-procedural control flow graph (implies '-m CC --CC-quiet')\n"
+          "\n"
+          "RFU OPTIONS:\n"
+          "     --RFU-show                  (Default) Show RFU metrics\n"
+          "     --RFU-quiet                 Do NOT output any RFU metrics (for CG generation)\n"
+          "     --RFU-simple                (Default) Non-CG based RFU estimation\n"
+          "     --RFU-transitive            CG based RFU estimation\n"
+          "\n"
+          "CC OPTIONS:\n"
+          "     --CC-show                   (Default) Show CC metrics\n"
+          "     --CC-quiet                  Do NOT output any CC metrics (for CFG generation)\n"
+          "\n"
+          "Have a question or need to report a bug?\n"
+          "Contact us at www.srcml.org/support.html\n"
+          "www.srcML.org\n"
+          "\n", stderr);
+}
+
+/**
+ * @brief Prints a 'Metric-NOT-found' error.
+ */
+static void showMetricNOTFoundError(char const* const abbreviation) {
+    fprintf(stderr, "\n"
+                    "Metric '%s' is NOT supported\n"
+                    "\n", abbreviation);
 }
 
 /**
  * @brief Prints the short help message.
  */
 static void showShortHelpMessage(void) {
-    fputs("srcmetrics typically accepts input from pipe, not a terminal\n", stderr);
-    fputs("Typical usage includes:\n", stderr);
-    fputs("\n", stderr);
-    fputs("    # compute all non-graph metrics of a source file and save it to standard out\n", stderr);
-    fputs("    srcmetrics main.c\n", stderr);
-    fputs("\n", stderr);
-    fputs("    # compute only Cyclomatic Complexity of a source file and save it to a report file\n", stderr);
-    fputs("    srcmetrics main.c -m CC -o report.csv\n", stderr);
-    fputs("\n", stderr);
-    fputs("See `srcmetrics --help` for more information\n", stderr);
+    fputs("\n"
+          "'srcmetrics' typically accepts input from pipe, not a terminal.\n"
+          "Typical usage includes:\n"
+          "\n"
+          "    # Compute all non-graph metrics of a source file and print it to standard out.\n"
+          "    srcmetrics examples/prime_preprocessed.c\n"
+          "\n"
+          "    # Compute the call graph of several source files.\n"
+          "    srcmetrics --cg examples/cg examples/" "*.c\n"
+          "\n"
+          "    # Compute the control flow graph of several source files.\n"
+          "    srcmetrics --cfg examples/ examples/" "*.c\n"
+          "\n"
+          "    # Compute everything!\n"
+          "    srcmetrics --cg examples/cg --cfg examples/cfg --ipcfg examples/ipcfg --all-metrics examples/" "*.c\n"
+          "\n"
+          "Execute `srcmetrics --help` for more information.\n"
+          "\n", stderr);
+}
+
+/**
+ * @brief Prints a short option 'must-be-alone' error.
+ */
+static void showShortOptionMustBeAloneError(char const short_option) {
+    fprintf(stderr, "\n"
+                    "Short option '-%c' must NOT be used with any other option.\n"
+                    "\n"
+                    "Execute `srcmetrics --help` for more information.\n"
+                    "\n", short_option);
+}
+
+/**
+ * @brief Prints a short option 'needs-parameters' error.
+ */
+static void showShortOptionNeedsParametersError(char const short_option) {
+    fprintf(stderr, "\n"
+                    "Short option '-%c' must be followed with parameter(s).\n"
+                    "\n"
+                    "Execute `srcmetrics --help` for more information.\n"
+                    "\n", short_option);
+}
+
+/**
+ * @brief Prints an unrecognized long option error.
+ */
+static void showUnrecognizedLongOptionError(char const* const option_str) {
+    fprintf(stderr, "\n"
+                    "Unrecognized long option '%s'\n"
+                    "\n"
+                    "Execute `srcmetrics --help` for more information.\n"
+                    "\n", option_str);
+}
+
+/**
+ * @brief Prints an unrecognized short option error.
+ */
+static void showUnrecognizedShortOptionError(char const short_option) {
+    fprintf(stderr, "\n"
+                    "Unrecognized short option '-%c'\n"
+                    "\n"
+                    "Execute `srcmetrics --help` for more information.\n"
+                    "\n", short_option);
 }
 
 /**
  * @brief Prints the program and library versions.
  */
 static void showVersion(void) {
-    fputs("srcmetrics "VERSION_SRCMETRICS"\n", stderr);
-    fprintf(stderr, "libsrcml %s\n", srcml_version_string()); /*, srcml_version_number());*/
+    fprintf(stderr, "\n"
+                    "srcmetrics "VERSION_SRCMETRICS"\n"
+                    "libsrcml %s\n"
+                    "\n", srcml_version_string());
 }
 
 /**@}*/
@@ -157,40 +289,22 @@ static void showVersion(void) {
  * WARNING: Does NOT check if valid file name (e.g. '>' and '&' characters)!!
  *
  * @param filename The '--files-from' file name.
- * @return 1 if it can get the infiles from file, 0 otherwise.
  */
-static bool getInfilesFromFile(char const* const restrict filename) {
-    unless (isValid_chunk(strings)) {
-        strings = constructEmpty_chunk(BUFSIZ);
-        atexit(free_strings);
-    }
-    unless (isValid_chunk(strings = open_readChunk_close(strings, filename))) return 0;
+static void getInfilesFromFile(char const* const filename) {
+    FILE* const stream = fopen(filename, "r");
+    if (stream == NULL) { showFileNOTFoundError(filename); exit(EXIT_FAILURE); }
 
-    {
-        char* true_start = strings.start;
-        while (true_start < strings.end && isspace(*true_start)) true_start++;
-        unless (true_start < strings.end) return 0;
+    options.first_infile_id = strings->nStrings;
 
-        unless (options.infiles) {
-            options.infiles = malloc(options.infiles_cap * sizeof(char*));
-            atexit(free_infiles);
-        }
+    DEBUG_ERROR_IF(fromStream_chunk(strings, stream, NULL) == 0xFFFFFFFF)
+    NDEBUG_EXECUTE(fromStream_chunk(strings, stream, NULL))
 
-        options.infiles[options.infiles_count++] = true_start;
-        for (char* ptr = true_start; ptr < strings.end;) {
-            unless (isspace(*ptr))  { ptr++; continue; }
-            while (isspace(*ptr))   { *(ptr++) = '\0'; }
-            unless (options.infiles_count < options.infiles_cap) {
-                unless (
-                    (options.infiles_cap <<= 1) > options.infiles_count &&
-                    (options.infiles = realloc(options.infiles, options.infiles_cap * sizeof(char*)))
-                ) return 0;
-            }
-            options.infiles[options.infiles_count++] = ptr;
-        }
-    }
+    DEBUG_ERROR_IF(options.first_infile_id == strings->nStrings)
 
-    return 1;
+    DEBUG_ERROR_IF(fclose(stream) == EOF)
+    NDEBUG_EXECUTE(fclose(stream))
+
+    options.last_infile_id = strings->nStrings - 1;
 }
 
 /**
@@ -200,28 +314,36 @@ static bool getInfilesFromFile(char const* const restrict filename) {
  *
  * @param filename The '--metrics-from' file name.
  * @param enable Enable metrics if 1, exclude otherwise.
- * @return 1 if it can get the metrics from file, 0 otherwise.
  */
-static bool getEnabledOrExcludedMetricsFromFile(char const* const restrict filename, bool const enable) {
-    unless (isValid_chunk(strings)) {
-        strings = constructEmpty_chunk(BUFSIZ);
-        atexit(free_strings);
-    }
-    unless (isValid_chunk(strings = open_readChunk_close(strings, filename))) return 0;
+static void getEnabledOrExcludedMetricsFromFile(char const* const filename, bool const enable) {
+    FILE* const stream = fopen(filename, "r");
+    if (stream == NULL) { showFileNOTFoundError(filename); exit(EXIT_FAILURE); }
 
-    {
-        char* true_start = strings.start;
-        while (true_start < strings.end && isspace(*true_start)) true_start++;
-        unless (true_start < strings.end) return 0;
+    DEBUG_ERROR_IF(fromStream_chunk(strings, stream, NULL) == 0xFFFFFFFF)
+    NDEBUG_EXECUTE(fromStream_chunk(strings, stream, NULL))
 
-        for (char* metric = true_start; metric < strings.end;) {
-            unless (isspace(*metric))   { metric++; continue; }
-            while (isspace(*metric))    { metric++; }
-            enableOrExclude_metric(metric, enable);
+    DEBUG_ERROR_IF(fclose(stream) == EOF)
+    NDEBUG_EXECUTE(fclose(stream))
+
+    uint32_t const firstMetricId = strings->nStrings;
+    for (uint32_t metricId = firstMetricId; metricId < strings->nStrings; metricId++) {
+        char const* metric = get_chunk(strings, metricId);
+        if (!enableOrExclude_metric(metric, enable)) {
+            showMetricNOTFoundError(metric);
+            exit(EXIT_FAILURE);
         }
     }
-    return 1;
 }
+
+bool isCFGEnabled(void)   { return options.flags & FLAG_CFG_ENABLE; }
+bool isCGEnabled(void)    { return options.flags & FLAG_CG_ENABLE; }
+bool isCGNoExternal(void) { return options.flags & FLAG_CG_NO_EXTERNAL; }
+bool isDotEnabled(void)   { return options.flags & FLAG_GRAPH_ENABLE_DOT; }
+bool isIPCFGEnabled(void) { return options.flags & FLAG_IPCFG_ENABLE; }
+bool isRFUQuiet(void)     { return !(options.flags & FLAG_RFU_SHOW); }
+bool isRFUSimple(void)    { return options.flags & FLAG_RFU_SIMPLE; }
+bool isVerbose(void)      { return options.flags & FLAG_VERBOSE; }
+bool isXmlEnabled(void)   { return options.flags & FLAG_GRAPH_ENABLE_XML; }
 
 /**
  * @brief Parses the command-line arguments and starts the metrics collection.
@@ -230,325 +352,606 @@ static bool getEnabledOrExcludedMetricsFromFile(char const* const restrict filen
  * @return EXIT_FAILURE if something goes wrong, EXIT_SUCCESS otherwise.
  */
 int main(int argc, char* argv[]) {
-    char** const finalArg = argv + argc - 1;
+    /* There has to be some arguments, or print the short help message. */
+    if (argc < 2) { showShortHelpMessage(); return EXIT_SUCCESS; }
 
-    options = OPTIONS_INITIAL;
+    /* The id of the final argument. */
+    int const finalArg_id = argc - 1;
 
-    fputs("\n", stderr);
-    atexit(putFinalNewLine);
+    /* Construct a Chunk for all strings. */
+    DEBUG_ASSERT_NDEBUG_EXECUTE(constructEmpty_chunk(strings, CHUNK_RECOMMENDED_PARAMETERS))
 
-    if (argc < 2) {
-        showShortHelpMessage();
-        return EXIT_SUCCESS;
-    }
+    /* Register the strings to be freed at the end. */
+    DEBUG_ERROR_IF(atexit(free_strings) != 0)
+    NDEBUG_EXECUTE(atexit(free_strings))
 
-    /* Process all arguments */
-    for (char** arg = argv + 1; arg <= finalArg; arg++) {
-        /* Check if this is an option argument */
-        if (**arg == '-') {
-            /* Short option format */
-
-            /* Assume the dash continues */
-            bool dash_continues = 1;
-
-            /* Process all options */
-            for (char const* option = *arg + 1; dash_continues && *option && !isspace(*option); option++) {
-                switch (*(option)) {
-                    case 'h':
-                        showLongHelpMessage();
-                        return EXIT_SUCCESS;
-                    case 'V':
-                        showVersion();
-                        return EXIT_SUCCESS;
-                    case 'c':
-                        showCopyrightMessage();
-                        return EXIT_SUCCESS;
-                    case 'l':
-                        dash_continues = 0;
-                        if (*(++option) == '=' && *(++option)) {
-                            options.language = option;
-                        } else unless (arg == finalArg) {
-                            options.language = *(++arg);
-                        } else {
-                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
-                        }
-                        break;
-                    case 'o':
-                        dash_continues = 0;
-                        if (*(++option) == '=' && *(++option)) {
-                            options.outfile = option;
-                        } else unless (arg == finalArg) {
-                            options.outfile = *(++arg);
-                        } else {
-                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
-                        }
-                        break;
-                    case 'q':
-                        options.statusOutput = NULL;
-                        break;
-                    case 'v':
-                        options.statusOutput = stderr;
-                        break;
-                    case 's':
-                        dash_continues = 0;
-                        if (*(++option) == '=' && *(++option)) {
-                            fprintf(stderr, "%s: %s\n", option, descriptionOf_metric(option));
-                        } else unless (arg == finalArg) {
-                            arg++;
-                            fprintf(stderr, "%s: %s\n", *arg, descriptionOf_metric(*arg));
-                        } else {
-                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
-                            break;
-                        }
-                        return EXIT_SUCCESS;
-                    case 'L':
-                        showListOf_metrics();
-                        return EXIT_SUCCESS;
-                    case 'm':
-                        dash_continues = 0;
-                        if (*(++option) == '=' && *(++option)) {
-                            unless (enableOrExclude_metric(option, 1))
-                                fprintf(stderr, "Unknown Metric: %s\n", option);
-                        } else unless (arg == finalArg) {
-                            unless (enableOrExclude_metric(*(++arg), 1))
-                                fprintf(stderr, "Unknown Metric: %s\n", *arg);
-                        } else {
-                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
-                        }
-                        break;
-                    case 'e':
-                        dash_continues = 0;
-                        if (*(++option) == '=' && *(++option)) {
-                            unless (enableOrExclude_metric(option, 0))
-                                fprintf(stderr, "Unknown Metric: %s\n", option);
-                        } else unless (arg == finalArg) {
-                            unless (enableOrExclude_metric(*(++arg), 0))
-                                fprintf(stderr, "Unknown Metric: %s\n", *arg);
-                        } else {
-                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
-                        }
-                        break;
-                    case 'f':
-                        dash_continues = 0;
-                        if (*(++option) == '=' && *(++option)) {
-                            unless (getEnabledOrExcludedMetricsFromFile(option, 1))
-                                fprintf(stderr, "Could NOT get enabled metrics from '%s'\n", option);
-                        } else unless (arg == finalArg) {
-                            unless (getEnabledOrExcludedMetricsFromFile(*(++arg), 1))
-                                fprintf(stderr, "Could NOT get enabled metrics from '%s'\n", *arg);
-                        } else {
-                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
-                        }
-                        break;
-                    case 'x':
-                        dash_continues = 0;
-                        if (*(++option) == '=' && *(++option)) {
-                            unless (getEnabledOrExcludedMetricsFromFile(option, 0))
-                                fprintf(stderr, "Could NOT get exclude metrics from '%s'\n", option);
-                        } else unless (arg == finalArg) {
-                            unless (getEnabledOrExcludedMetricsFromFile(*(++arg), 0))
-                                fprintf(stderr, "Could NOT get exclude metrics from '%s'\n", *arg);
-                        } else {
-                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
-                        }
-                        break;
-                    case 'd':
-                        dash_continues = 0;
-                        if (*(++option) == '=' && *(++option))
-                            csv_delimeter = option;
-                        else unless (arg == finalArg)
-                            csv_delimeter = *(++arg);
-                        else
-                            fprintf(stderr, "There is something wrong in argument = %s\n", *arg);
+    /* Evaluate arguments */
+    for (int arg_id = 1; arg_id <= finalArg_id; arg_id++) {
+        switch (argv[arg_id][0]) {
+            case '-':
+                if (argv[arg_id][1] == '\0') {
+                    showBareShortOptionError();
+                    return EXIT_SUCCESS;
+                }
+                int i = 0;
+SRCMETRICS_NEXT_OPTION_CHAR:
+                i++;
+                switch (argv[arg_id][i]) {
+                    case '\0':
                         break;
                     case '-':
-                        /* Long option format */
-                        dash_continues = 0;
-                        if (str_eq_const(++option, "help")) {
+                        if (STR_EQ_CONST(argv[arg_id], "--all-metrics")) {
+                            options.enabledMetrics |= ALL_METRICS_ENABLED;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--cfg")) {
+                            if (arg_id < finalArg_id) {
+                                options.flags |= FLAG_CFG_ENABLE;
+                                DEBUG_ASSERT_NDEBUG_EXECUTE(enableOrExclude_metric("CC", 1))
+                                options.flags &= FLAG_CC_QUIET;
+                                arg_id++;
+                                options.cfg_name = argv[arg_id];
+                                break;
+                            } else {
+                                showLongOptionNeedsParametersError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_CONTAINS_CONST(argv[arg_id], "--cfg=")) {
+                            options.flags |= FLAG_CFG_ENABLE;
+                            DEBUG_ASSERT_NDEBUG_EXECUTE(enableOrExclude_metric("CC", 1))
+                            options.flags &= FLAG_CC_QUIET;
+                            options.cfg_name = argv[arg_id] + 6;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--cg")) {
+                            if (arg_id < finalArg_id) {
+                                options.flags |= FLAG_CG_ENABLE;
+                                DEBUG_ASSERT_NDEBUG_EXECUTE(enableOrExclude_metric("RFU", 1))
+                                options.flags &= FLAG_RFU_QUIET;
+                                arg_id++;
+                                options.cg_name = argv[arg_id];
+                                break;
+                            } else {
+                                showLongOptionNeedsParametersError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_CONTAINS_CONST(argv[arg_id], "--cg=")) {
+                            options.flags |= FLAG_CG_ENABLE;
+                            DEBUG_ASSERT_NDEBUG_EXECUTE(enableOrExclude_metric("RFU", 1))
+                            options.flags &= FLAG_RFU_QUIET;
+                            options.cg_name = argv[arg_id] + 5;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--cg-no-external")) {
+                            options.flags |= FLAG_CG_NO_EXTERNAL;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--cg-show-external")) {
+                            options.flags &= (~FLAG_CG_NO_EXTERNAL);
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--copyright")) {
+                            if (arg_id == 1 && arg_id == finalArg_id) {
+                                showCopyright();
+                                return EXIT_SUCCESS;
+                            } else {
+                                showLongOptionMustBeAloneError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_EQ_CONST(argv[arg_id], "--CC-quiet")) {
+                            options.flags &= FLAG_CC_QUIET;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--CC-show")) {
+                            options.flags |= FLAG_CC_SHOW;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--delimeter")) {
+                            if (arg_id < finalArg_id) {
+                                csv_delimeter = argv[++arg_id];
+                                break;
+                            } else {
+                                showLongOptionNeedsParametersError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_CONTAINS_CONST(argv[arg_id], "--delimeter=")) {
+                            csv_delimeter = argv[arg_id] + 12;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--exclude")) {
+                            if (arg_id < finalArg_id) {
+                                arg_id++;
+                                if (enableOrExclude_metric(argv[arg_id], 0)) {
+                                    break;
+                                } else {
+                                    showMetricNOTFoundError(argv[arg_id]);
+                                    return EXIT_FAILURE;
+                                }
+                            } else {
+                                showLongOptionNeedsParametersError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_CONTAINS_CONST(argv[arg_id], "--exclude=")) {
+                            if (enableOrExclude_metric(argv[arg_id] + 10, 0)) {
+                                break;
+                            } else {
+                                showMetricNOTFoundError(argv[arg_id] + 10);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_EQ_CONST(argv[arg_id], "--excluded-from")) {
+                            if (arg_id < finalArg_id) {
+                                getEnabledOrExcludedMetricsFromFile(argv[++arg_id], 0);
+                                break;
+                            } else {
+                                showLongOptionNeedsParametersError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_CONTAINS_CONST(argv[arg_id], "--excluded-from=")) {
+                            getEnabledOrExcludedMetricsFromFile(argv[arg_id] + 16, 0);
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--files-from")) {
+                            if (arg_id < finalArg_id) {
+                                getInfilesFromFile(argv[++arg_id]);
+                                break;
+                            } else {
+                                showLongOptionNeedsParametersError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_CONTAINS_CONST(argv[arg_id], "--files-from=")) {
+                            getInfilesFromFile(argv[arg_id] + 13);
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--graph-enable-dot")) {
+                            options.flags |= FLAG_GRAPH_ENABLE_DOT;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--graph-disable-dot")) {
+                            options.flags &= FLAG_GRAPH_DISABLE_DOT;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--graph-enable-xml")) {
+                            options.flags |= FLAG_GRAPH_ENABLE_XML;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--graph-disable-xml")) {
+                            options.flags &= FLAG_GRAPH_DISABLE_XML;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--help")) {
+                            if (arg_id == 1 && arg_id == finalArg_id) {
+                                showLongHelpMessage();
+                                return EXIT_SUCCESS;
+                            } else {
+                                showLongOptionMustBeAloneError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_EQ_CONST(argv[arg_id], "--ipcfg")) {
+                            if (arg_id < finalArg_id) {
+                                options.flags |= FLAG_IPCFG_ENABLE;
+                                DEBUG_ASSERT_NDEBUG_EXECUTE(enableOrExclude_metric("CC", 1))
+                                options.flags &= FLAG_CC_QUIET;
+                                arg_id++;
+                                options.ipcfg_name = argv[arg_id];
+                                break;
+                            } else {
+                                showLongOptionNeedsParametersError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_CONTAINS_CONST(argv[arg_id], "--ipcfg=")) {
+                            options.flags |= FLAG_IPCFG_ENABLE;
+                            DEBUG_ASSERT_NDEBUG_EXECUTE(enableOrExclude_metric("CC", 1))
+                            options.flags &= FLAG_CC_QUIET;
+                            options.ipcfg_name = argv[arg_id] + 6;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--language")) {
+                            if (arg_id < finalArg_id) {
+                                options.language = "C";
+                                arg_id++;
+                                break;
+                            } else {
+                                showLongOptionNeedsParametersError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_CONTAINS_CONST(argv[arg_id], "--language=")) {
+                            options.language = "C";
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--list")) {
+                            if (arg_id == 1 && arg_id == finalArg_id) {
+                                showListOf_metrics();
+                                return EXIT_SUCCESS;
+                            } else {
+                                showLongOptionMustBeAloneError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_EQ_CONST(argv[arg_id], "--metric")) {
+                            if (arg_id < finalArg_id) {
+                                arg_id++;
+                                if (enableOrExclude_metric(argv[arg_id], 1)) {
+                                    break;
+                                } else {
+                                    showMetricNOTFoundError(argv[arg_id]);
+                                    return EXIT_FAILURE;
+                                }
+                            } else {
+                                showLongOptionNeedsParametersError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_CONTAINS_CONST(argv[arg_id], "--metric=")) {
+                            if (enableOrExclude_metric(argv[arg_id] + 10, 1)) {
+                                break;
+                            } else {
+                                showMetricNOTFoundError(argv[arg_id] + 10);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_EQ_CONST(argv[arg_id], "--metrics-from")) {
+                            if (arg_id < finalArg_id) {
+                                getEnabledOrExcludedMetricsFromFile(argv[++arg_id], 1);
+                                break;
+                            } else {
+                                showLongOptionNeedsParametersError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_CONTAINS_CONST(argv[arg_id], "--metrics-from=")) {
+                            getEnabledOrExcludedMetricsFromFile(argv[arg_id] + 15, 1);
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--no-cfg")) {
+                            options.flags &= FLAG_CFG_DISABLE;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--no-cg")) {
+                            options.flags &= FLAG_CG_DISABLE;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--output")) {
+                            if (arg_id < finalArg_id) {
+                                options.outfile = argv[++arg_id];
+                                break;
+                            } else {
+                                showLongOptionNeedsParametersError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_CONTAINS_CONST(argv[arg_id], "--output=")) {
+                            options.outfile = argv[arg_id] + 9;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--RFU-quiet")) {
+                            options.flags &= FLAG_RFU_QUIET;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--RFU-show")) {
+                            options.flags |= FLAG_RFU_SHOW;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--RFU-simple")) {
+                            options.flags |= FLAG_RFU_SIMPLE;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--RFU-transitive")) {
+                            options.flags &= FLAG_RFU_TRANSITIVE;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--show")) {
+                            if (arg_id != 1) {
+                                showLongOptionMustBeAloneError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            } else if (arg_id == finalArg_id) {
+                                showLongOptionNeedsParametersError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            } else {
+                                fputs("\n", stderr);
+                                for (arg_id++; arg_id < argc; arg_id++)
+                                    showDescription(argv[arg_id], descriptionOf_metric(argv[arg_id]));
+                                fputs("\n", stderr);
+                                return EXIT_SUCCESS;
+                            }
+                        } else if (STR_CONTAINS_CONST(argv[arg_id], "--show=")) {
+                            if (arg_id == 1 && arg_id == finalArg_id) {
+                                fputs("\n", stderr);
+                                showDescription(argv[arg_id] + 7, descriptionOf_metric(argv[arg_id] + 7));
+                                fputs("\n", stderr);
+                                return EXIT_SUCCESS;
+                            } else {
+                                showLongOptionMustBeAloneError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (STR_EQ_CONST(argv[arg_id], "--verbose")) {
+                            options.flags |= FLAG_VERBOSE;
+                            break;
+                        } else if (STR_EQ_CONST(argv[arg_id], "--version")) {
+                            if (arg_id == 1 && arg_id == finalArg_id) {
+                                showVersion();
+                                return EXIT_SUCCESS;
+                            } else {
+                                showLongOptionMustBeAloneError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else {
+                            showUnrecognizedLongOptionError(argv[arg_id]);
+                            return EXIT_FAILURE;
+                        }
+                    case 'a':
+                        options.enabledMetrics |= ALL_METRICS_ENABLED;
+                        if (argv[arg_id][i + 1] == '\0') {
+                            break;
+                        } else {
+                            goto SRCMETRICS_NEXT_OPTION_CHAR;
+                        }
+                    case 'c':
+                        if (argv[arg_id][i + 1] == '\0' && arg_id == 1 && arg_id == finalArg_id) {
+                            showCopyright();
+                            return EXIT_SUCCESS;
+                        } else {
+                            showShortOptionMustBeAloneError(argv[arg_id][i]);
+                            return EXIT_FAILURE;
+                        }
+                    case 'd':
+                        if (argv[arg_id][i + 1] == '=') {
+                            csv_delimeter = argv[arg_id] + i + 2;
+                            break;
+                        } else if (argv[arg_id][i + 1] == '\0' && arg_id < finalArg_id) {
+                            csv_delimeter = argv[++arg_id];
+                            break;
+                        } else {
+                            showShortOptionNeedsParametersError(argv[arg_id][i]);
+                            return EXIT_FAILURE;
+                        }
+                    case 'e':
+                        if (argv[arg_id][i + 1] == '=') {
+                            if (enableOrExclude_metric(argv[arg_id] + i + 2, 0)) {
+                                break;
+                            } else {
+                                showMetricNOTFoundError(argv[arg_id] + i + 2);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (argv[arg_id][i + 1] == '\0' && arg_id < finalArg_id) {
+                            arg_id++;
+                            if (enableOrExclude_metric(argv[arg_id], 0)) {
+                                break;
+                            } else {
+                                showMetricNOTFoundError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else {
+                            showShortOptionNeedsParametersError(argv[arg_id][i]);
+                            return EXIT_FAILURE;
+                        }
+                    case 'f':
+                        if (argv[arg_id][i + 1] == '=') {
+                            getEnabledOrExcludedMetricsFromFile(argv[arg_id] + i + 2, 1);
+                            break;
+                        } else if (argv[arg_id][i + 1] == '\0' && arg_id < finalArg_id) {
+                            getEnabledOrExcludedMetricsFromFile(argv[++arg_id], 1);
+                            break;
+                        } else {
+                            showShortOptionNeedsParametersError(argv[arg_id][i]);
+                            return EXIT_FAILURE;
+                        }
+                    case 'h':
+                        if (argv[arg_id][i + 1] == '\0' && arg_id == 1 && arg_id == finalArg_id) {
                             showLongHelpMessage();
                             return EXIT_SUCCESS;
-                        } else if (str_eq_const(option, "version")) {
-                            showVersion();
-                            return EXIT_SUCCESS;
-                        } else if (str_eq_const(option, "copyright")) {
-                            showCopyrightMessage();
-                            return EXIT_SUCCESS;
-                        } else if (str_eq_const(option, "quiet")) {
-                            options.statusOutput = NULL;
-                        } else if (str_eq_const(option, "verbose")) {
-                            options.statusOutput = stderr;
-                        } else if (str_eq_const(option, "language=")) {
-                            options.language = option + sizeof("language");
-                        } else if (str_eq_const(option, "output=")) {
-                            options.outfile = option + sizeof("output");
-                        } else if (str_eq_const(option, "files-from=")) {
-                            unless (getInfilesFromFile((option + sizeof("files-from")))) {
-                                fprintf(stderr, "Could NOT get infiles from '%s'\n", *arg);
-                                return EXIT_FAILURE;
-                            }
-                        } else if (str_eq_const(option, "show=")) {
-                            option += sizeof("show");
-                            fprintf(stderr, "%s: %s\n", option, descriptionOf_metric(option));
-                            return EXIT_SUCCESS;
-                        } else if (str_eq_const(option, "metric=")) {
-                            enableOrExclude_metric(option + sizeof("metric"), 1);
-                        } else if (str_eq_const(option, "exclude=")) {
-                            enableOrExclude_metric(option + sizeof("exclude"), 0);
-                        } else if (str_eq_const(option, "metrics-from=")) {
-                            unless (getEnabledOrExcludedMetricsFromFile(option + sizeof("metrics-from"), 1)) {
-                                fprintf(stderr, "Could NOT get enabled metrics from '%s'\n", *arg);
-                                return EXIT_FAILURE;
-                            }
-                        } else if (str_eq_const(option, "excluded-from=")) {
-                            unless (getEnabledOrExcludedMetricsFromFile(option + sizeof("exclude-from"), 0)) {
-                                fprintf(stderr, "Could NOT get enabled metrics from '%s'\n", *arg);
-                                return EXIT_FAILURE;
-                            }
-                        } else if (str_eq_const(option, "delimeter=")) {
-                            csv_delimeter = option + sizeof("delimeter");
-                        } else if (str_eq_const(option, "language") && arg != finalArg) {
-                            options.language = *(++arg);
-                        } else if (str_eq_const(option, "output") && arg != finalArg) {
-                            options.outfile = *(++arg);
-                        } else if (str_eq_const(option, "files-from") && arg != finalArg) {
-                            unless (getInfilesFromFile(*(++arg))) {
-                                fprintf(stderr, "Could NOT get infiles from '%s'\n", *arg);
-                                return EXIT_FAILURE;
-                            }
-                        } else if (str_eq_const(option, "show")) {
-                            arg++;
-                            fprintf(stderr, "%s: %s\n", *arg, descriptionOf_metric(*arg));
-                            return EXIT_SUCCESS;
-                        } else if (str_eq_const(option, "list")) {
+                        } else {
+                            showShortOptionMustBeAloneError(argv[arg_id][i]);
+                            return EXIT_FAILURE;
+                        }
+                    case 'l':
+                        if (argv[arg_id][i + 1] == '=') {
+                            options.language = "C";
+                            break;
+                        } else if (argv[arg_id][i + 1] == '\0' && arg_id < finalArg_id) {
+                            options.language = "C";
+                            arg_id++;
+                            break;
+                        } else {
+                            showShortOptionNeedsParametersError(argv[arg_id][i]);
+                            return EXIT_FAILURE;
+                        }
+                    case 'L':
+                        if (argv[arg_id][i + 1] == '\0' && arg_id == 1 && arg_id == finalArg_id) {
                             showListOf_metrics();
                             return EXIT_SUCCESS;
-                        } else if (str_eq_const(option, "metric")) {
-                            unless (enableOrExclude_metric(*(++arg), 1))
-                                fprintf(stderr, "Unknown Metric: %s\n", *arg);
-                        } else if (str_eq_const(option, "exclude")) {
-                            unless (enableOrExclude_metric(*(++arg), 0))
-                                fprintf(stderr, "Unknown Metric: %s\n", *arg);
-                        } else if (str_eq_const(option, "metrics-from")) {
-                            unless (getEnabledOrExcludedMetricsFromFile(*(++arg), 1)) {
-                                fprintf(stderr, "Could NOT get enabled metrics from '%s'\n", *arg);
-                                return EXIT_FAILURE;
-                            }
-                        } else if (str_eq_const(option, "excluded-from")) {
-                            unless (getEnabledOrExcludedMetricsFromFile(*(++arg), 0)) {
-                                fprintf(stderr, "Could NOT get excluded metrics from '%s'\n", *arg);
-                                return EXIT_FAILURE;
-                            }
-                        } else if (str_eq_const(option, "delimeter") && arg != finalArg) {
-                            csv_delimeter = *(++arg);
                         } else {
-                            fprintf(stderr, "Could NOT understand long option = %s\n", *arg);
+                            showShortOptionMustBeAloneError(argv[arg_id][i]);
+                            return EXIT_FAILURE;
                         }
-                        break;
+                    case 'm':
+                        if (argv[arg_id][i + 1] == '=') {
+                            if (enableOrExclude_metric(argv[arg_id] + i + 2, 1)) {
+                                break;
+                            } else {
+                                showMetricNOTFoundError(argv[arg_id] + i + 2);
+                                return EXIT_FAILURE;
+                            }
+                        } else if (argv[arg_id][i + 1] == '\0' && arg_id < finalArg_id) {
+                            arg_id++;
+                            if (enableOrExclude_metric(argv[arg_id], 1)) {
+                                break;
+                            } else {
+                                showMetricNOTFoundError(argv[arg_id]);
+                                return EXIT_FAILURE;
+                            }
+                        } else {
+                            showShortOptionNeedsParametersError(argv[arg_id][i]);
+                            return EXIT_FAILURE;
+                        }
+                    case 'o':
+                        if (argv[arg_id][i + 1] == '=') {
+                            options.outfile = argv[arg_id] + i + 2;
+                            break;
+                        } else if (argv[arg_id][i + 1] == '\0' && arg_id < finalArg_id) {
+                            options.outfile = argv[++arg_id];
+                            break;
+                        } else {
+                            showShortOptionNeedsParametersError(argv[arg_id][i]);
+                            return EXIT_FAILURE;
+                        }
+                    case 's':
+                        if (argv[arg_id][i + 1] == '=' && arg_id == 1 && arg_id == finalArg_id) {
+                            fputs("\n", stderr);
+                            showDescription(argv[arg_id] + i + 2, descriptionOf_metric(argv[arg_id] + i + 2));
+                            fputs("\n", stderr);
+                            return EXIT_SUCCESS;
+                        } else if (argv[arg_id][i + 1] == '\0' && arg_id == 1) {
+                            if (arg_id == finalArg_id) {
+                                showShortOptionNeedsParametersError(argv[arg_id][i]);
+                                return EXIT_FAILURE;
+                            } else {
+                                fputs("\n", stderr);
+                                for (arg_id++; arg_id < argc; arg_id++)
+                                    showDescription(argv[arg_id], descriptionOf_metric(argv[arg_id]));
+                                fputs("\n", stderr);
+                                return EXIT_SUCCESS;
+                            }
+                        } else {
+                            showShortOptionMustBeAloneError(argv[arg_id][i]);
+                            return EXIT_FAILURE;
+                        }
+                    case 'v':
+                        options.flags |= FLAG_VERBOSE;
+                        if (argv[arg_id][i + 1] == '\0') {
+                            break;
+                        } else {
+                            goto SRCMETRICS_NEXT_OPTION_CHAR;
+                        }
+                    case 'V':
+                        if (argv[arg_id][i + 1] == '\0' && arg_id == 1 && arg_id == finalArg_id) {
+                            showVersion();
+                            return EXIT_SUCCESS;
+                        } else {
+                            showShortOptionMustBeAloneError(argv[arg_id][i]);
+                            return EXIT_FAILURE;
+                        }
+                    case 'x':
+                        if (argv[arg_id][i + 1] == '=') {
+                            getEnabledOrExcludedMetricsFromFile(argv[arg_id] + i + 2, 0);
+                            break;
+                        } else if (argv[arg_id][i + 1] == '\0' && arg_id < finalArg_id) {
+                            getEnabledOrExcludedMetricsFromFile(argv[++arg_id], 0);
+                            break;
+                        } else {
+                            showShortOptionNeedsParametersError(argv[arg_id][i]);
+                            return EXIT_FAILURE;
+                        }
                     default:
-                        fprintf(stderr, "Unknown option '%c' in argument = %s\n", *(option), *arg);
-                        break;
+                        showUnrecognizedShortOptionError(argv[arg_id][i]);
+                        return EXIT_FAILURE;
                 }
-            }
-        } else {
-            /* Default Argument: Input Files */
-
-            /* Cannot declare files both from argv and 'files-from' */
-            for (char** arg2 = argv + 1; arg2 <= finalArg; arg2++) {
-                unless (str_eq_const(*arg2, "–-files-from") && arg != arg2) continue;
-                showLongHelpMessage();
-                return EXIT_FAILURE;
-            }
-
-            unless (options.infiles) {
-                options.infiles = malloc(options.infiles_cap * sizeof(char*));
-                atexit(free_infiles);
-            }
-
-            unless (options.infiles_count < options.infiles_cap) {
-                unless (
-                    (options.infiles_cap <<= 1) > options.infiles_count &&
-                    (options.infiles = realloc(options.infiles, options.infiles_cap * sizeof(char*)))
-                ) { fputs("Could NOT get infiles\n", stderr); return EXIT_FAILURE; };
-            }
-
-            options.infiles[options.infiles_count++] = *arg;
+                break;
+            default:
+                if (options.cmd_infiles == NULL) {
+                    options.cmd_infiles = malloc(options.cap_cmd_infiles * sizeof(char const*));
+                    DEBUG_ERROR_IF(options.cmd_infiles == NULL)
+                    DEBUG_ERROR_IF(atexit(free_infiles) != 0)
+                    NDEBUG_EXECUTE(atexit(free_infiles))
+                }
+                REALLOC_IF_NECESSARY(
+                    char const*, options.cmd_infiles,
+                    size_t, options.cap_cmd_infiles, options.n_cmd_infiles,
+                    {REALLOC_ERROR;}
+                )
+                options.cmd_infiles[options.n_cmd_infiles++] = argv[arg_id];
         }
     }
 
-    /* This code is for trial and should be deleted */
-    {
-        /* First Task: Create an archive in the memory */
-        size_t archiveBufferSize = 0U;
-        char* archiveBuffer = NULL;
-        struct srcml_archive* archive = srcml_archive_create();
-        unless (srcml_archive_write_open_memory(archive, &archiveBuffer, &archiveBufferSize) == SRCML_STATUS_OK) {
-            fputs("Cannot create archive\n", stderr);
-            return EXIT_FAILURE;
-        }
+    /* Register infiles coming from --from-file argument
+     * These files were put into the strings chunk. */
+    if (options.first_infile_id != 0xFFFFFFFF) {
+        for (
+            uint32_t infileId = options.first_infile_id;
+            infileId <= options.last_infile_id;
+            infileId++
+        ) {
+            char const* infile = get_chunk(strings, infileId);
+            DEBUG_ERROR_IF(infile == NULL)
 
-        /* Parse all units into an archive */
-        {
-            char* unitBuffer = malloc(131072U);
-            /* For every file */
-            for (char** infile = options.infiles + options.infiles_count - 1; infile >= options.infiles; infile--) {
-                int srcml_fd;
-                ssize_t nBytes;
-                struct srcml_unit* unit = srcml_unit_create(archive);
-                /* NOTE: I assume every file contains exactly one unit. This is true for C but maybe not for Java */
-
-                /* Open the input source code */
-                if ((srcml_fd = open(*infile, O_RDONLY, 0)) == -1) { fprintf(stderr, "Could NOT open %s\n", *infile); return EXIT_FAILURE; }
-
-                /* Read the source code into the unit buffer */
-                if ((nBytes = read(srcml_fd, unitBuffer, 131071U)) == -1) { fputs("Read Error\n", stderr); return EXIT_FAILURE; }
-
-                /* Just a size check */
-                if (nBytes >= 131070) { fprintf(stderr, "%s is too big to read (%zu bytes)\n", *infile, (size_t)nBytes); return EXIT_FAILURE; }
-
-                /* Close the file */
-                if (close(srcml_fd) == -1) { fprintf(stderr, "Cannot close %s\n", *infile); return EXIT_FAILURE; }
-
-                /* Set language to C */
-                unless (srcml_unit_set_language(unit, SRCML_LANGUAGE_C) == SRCML_STATUS_OK) { fputs("Cannot set language\n", stderr); return EXIT_FAILURE; }
-
-                /* Set filename */
-                unless (srcml_unit_set_filename(unit, *infile) == SRCML_STATUS_OK) { fputs("Cannot set file\n", stderr); return EXIT_FAILURE; }
-
-                /* Create the unit */
-                unless (srcml_unit_parse_memory(unit, unitBuffer, (size_t)nBytes) == SRCML_STATUS_OK) { fputs("Cannot parse unit\n", stderr); return EXIT_FAILURE; }
-
-                /* Append to the archive */
-                /* Q: Did I copy the unit by doing this? */
-                unless (srcml_archive_write_unit(archive, unit) == SRCML_STATUS_OK) { fputs("Cannot write unit to archive\n", stderr); return EXIT_FAILURE; }
-
-                /* If I copied the unit to the archive, I should free the dangling unit */
-                srcml_unit_free(unit);
+            if (options.cmd_infiles == NULL) {
+                options.cmd_infiles = malloc(options.cap_cmd_infiles * sizeof(char const*));
+                DEBUG_ERROR_IF(options.cmd_infiles == NULL)
+                DEBUG_ERROR_IF(atexit(free_infiles) != 0)
             }
-            free(unitBuffer);
-        }
 
-        /* Close the archive */
-        srcml_archive_close(archive);
+            REALLOC_IF_NECESSARY(
+                char const*, options.cmd_infiles,
+                size_t, options.cap_cmd_infiles, options.n_cmd_infiles,
+                {REALLOC_ERROR;}
+            )
 
-        /* Free the archive */
-        srcml_archive_free(archive);
-
-        /* Second Task: Do srcsax stuff on the archive */
-        {
-            struct srcsax_handler* events = getStaticEventHandler();
-            struct srcsax_context* context = srcsax_create_context_memory(archiveBuffer, archiveBufferSize, NULL);
-            unless (context) { fputs("SRCSAX_ERROR\n", stderr); return EXIT_FAILURE; }
-
-            /* VERY IMPORTANT, DO NOT FORGET */
-            context->handler = events;
-
-            if (srcsax_parse(context) == -1) { fputs("PARSE_ERROR\n", stderr); return EXIT_FAILURE; }
-
-            unless (reportCsv()) { fputs("REPORT_ERROR\n", stderr); return EXIT_FAILURE; }
-
-            srcsax_free_context(context);
+            options.cmd_infiles[options.n_cmd_infiles++] = infile;
         }
     }
+
+    if (options.n_cmd_infiles == 0) return EXIT_SUCCESS;
+
+    Chunk chunk[1];
+    size_t archiveBufferSize            = 0;
+    char* archiveBuffer                 = NULL;
+    struct srcml_archive* const archive = srcml_archive_create();
+    DEBUG_ASSERT_NDEBUG_EXECUTE(constructEmpty_chunk(chunk, CHUNK_RECOMMENDED_INITIAL_CAP, 1))
+
+    DEBUG_ERROR_IF(srcml_archive_write_open_memory(archive, &archiveBuffer, &archiveBufferSize) != SRCML_STATUS_OK)
+    NDEBUG_EXECUTE(srcml_archive_write_open_memory(archive, &archiveBuffer, &archiveBufferSize))
+    VERBOSE_MSG_LITERAL("CREATED_EMPTY_SRCML_ARCHIVE");
+
+    for (size_t infile_id = options.n_cmd_infiles - 1; infile_id != SIZE_MAX; infile_id--) {
+        char const* const infile = options.cmd_infiles[infile_id];
+
+        VERBOSE_MSG_VARIADIC("SRCML_UNIT = %s", infile);
+
+        /* NOTE: I assume every file contains exactly one unit.
+         * This is true for C but maybe not for Java */
+        struct srcml_unit* const unit = srcml_unit_create(archive);
+
+        VERBOSE_MSG_LITERAL("SRCML_LANGUAGE = C");
+
+        /* Set language to C */
+        DEBUG_ERROR_IF(srcml_unit_set_language(unit, SRCML_LANGUAGE_C) != SRCML_STATUS_OK)
+        NDEBUG_EXECUTE(srcml_unit_set_language(unit, SRCML_LANGUAGE_C))
+
+        VERBOSE_MSG_VARIADIC("SRCML_SET_FILENAME = %s", infile);
+
+        /* Set filename */
+        DEBUG_ERROR_IF(srcml_unit_set_filename(unit, infile) != SRCML_STATUS_OK)
+        NDEBUG_EXECUTE(srcml_unit_set_filename(unit, infile))
+
+        /* Read the unit file */
+        FILE* const stream = fopen(infile, "r");
+        if (stream == NULL) { showFileNOTFoundError(infile); return EXIT_FAILURE; }
+
+        DEBUG_ERROR_IF(fromStreamAsWhole_chunk(chunk, stream) == 0xFFFFFFFF)
+        NDEBUG_EXECUTE(fromStreamAsWhole_chunk(chunk, stream))
+
+        DEBUG_ERROR_IF(fclose(stream) == EOF)
+        NDEBUG_EXECUTE(fclose(stream))
+
+        VERBOSE_MSG_VARIADIC("SRCML_UNIT_PARSE => %llu bytes", chunk->len);
+
+        /* Create the unit */
+        DEBUG_ERROR_IF(srcml_unit_parse_memory(unit, chunk->start, chunk->len) != SRCML_STATUS_OK)
+        NDEBUG_EXECUTE(srcml_unit_parse_memory(unit, chunk->start, chunk->len))
+
+        VERBOSE_MSG_VARIADIC("SRCML_ARCHIVE_WRITE => %s", infile);
+
+        /* Append to the archive */
+        DEBUG_ERROR_IF(srcml_archive_write_unit(archive, unit) != SRCML_STATUS_OK)
+        NDEBUG_EXECUTE(srcml_archive_write_unit(archive, unit))
+
+        VERBOSE_MSG_VARIADIC("SRCML_FREE => %s", infile);
+
+        /* Copied the unit to the archive, now free the dangling unit */
+        srcml_unit_free(unit);
+
+        /* Flush the chunk */
+        DEBUG_ASSERT_NDEBUG_EXECUTE(flush_chunk(chunk))
+    }
+
+    /* Free the chunk */
+    DEBUG_ASSERT_NDEBUG_EXECUTE(free_chunk(chunk))
+
+    /* Close the archive */
+    srcml_archive_close(archive);
+
+    /* Free the archive */
+    srcml_archive_free(archive);
+
+    /* Second Task: Do srcsax stuff on the archive */
+    struct srcsax_context* context = srcsax_create_context_memory(archiveBuffer, archiveBufferSize, NULL);
+    DEBUG_ERROR_IF(context == NULL)
+
+    /* VERY IMPORTANT, DO NOT FORGET */
+    context->handler = getStaticEventHandler();
+
+    VERBOSE_MSG_LITERAL("SRCSAX_CONTEXT_CREATED");
+
+    DEBUG_ERROR_IF(srcsax_parse(context) == -1)
+    NDEBUG_EXECUTE(srcsax_parse(context))
+
+    VERBOSE_MSG_LITERAL("SRCSAX_PARSE_COMPLETED");
+
+    DEBUG_ASSERT_NDEBUG_EXECUTE(reportCsv())
+
+    VERBOSE_MSG_LITERAL("REPORT_CSV_COMPLETED");
+
+    srcsax_free_context(context);
 
     return EXIT_SUCCESS;
 }

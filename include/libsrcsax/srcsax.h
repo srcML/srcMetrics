@@ -21,7 +21,7 @@
 #define INCLUDED_SRCSAX_H
 
 #include <libxml/parser.h>
-#include "libsrcsax/srcsax_handler.h"
+#include "srcsax_handler.h"
 
 #ifdef __cplusplus
 extern "C" {

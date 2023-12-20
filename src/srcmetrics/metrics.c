@@ -4,46 +4,47 @@
  * @author Yavuz Koroglu
  * @see metrics.h
  */
-#include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 
+#include "srcmetrics.h"
 #include "srcmetrics/metrics.h"
-#include "srcmetrics/options.h"
-#include "util/chunk.h"
-#include "util/unless.h"
+#include "padkit/chunk.h"
+#include "padkit/streq.h"
 
-static char const* metrics[] = METRICS;
+static char const* metrics[]             = METRICS;
 static char const* metric_descriptions[] = METRIC_DESCRIPTIONS;
 
-size_t indexOf_metric(char const* const restrict abbreviation) {
-    unless (abbreviation) return NOT_A_METRIC_ID;
+size_t indexOf_metric(char const* const abbreviation) {
+    if (abbreviation == NULL) return NOT_A_METRIC_ID;
     for (size_t metricId = 0; metrics[metricId]; metricId++) {
-        unless (!strncmp(abbreviation, metrics[metricId], strlen(metrics[metricId]))) continue;
-        return metricId;
+        if (str_eq(abbreviation, metrics[metricId])) return metricId;
     }
     return NOT_A_METRIC_ID;
 }
 
-char const* descriptionOf_metric(char const* const restrict abbreviation) {
+char const* descriptionOf_metric(char const* const abbreviation) {
     size_t const index = indexOf_metric(abbreviation);
-    return index == NOT_A_METRIC_ID ? DESCRIPTION_OF_NOT_A_METRIC : metric_descriptions[index];
+    if (index == NOT_A_METRIC_ID) return DESCRIPTION_OF_NOT_A_METRIC;
+    return metric_descriptions[index];
 }
 
 void showListOf_metrics(void) {
-    fprintf(stderr, "Supported Metrics =\n    %s", metrics[0]);
-    for (char const** metric = metrics + 1; *metric; metric++) {
-        fprintf(stderr, "\n    %s", *metric);
+    fputs("\n"
+          "Supported Metrics =", stderr);
+    for (char const** metric = metrics; *metric; metric++) {
+        fprintf(stderr, "\n    %*s: %s", 5, *metric, descriptionOf_metric(*metric));
     }
-    fputs("\n", stderr);
+    fputs("\n\n", stderr);
 }
 
 bool isValidIndex_metric(size_t const metricId) {
     return metricId < (sizeof(metrics) / sizeof(char const*));
 }
 
-bool enableOrExclude_metric(char const* const restrict abbreviation, bool const enable) {
-    uint_fast64_t const metricId = indexOf_metric(abbreviation);
-    unless (isValidIndex_metric(metricId)) return 0;
+bool enableOrExclude_metric(char const* const abbreviation, bool const enable) {
+    size_t const metricId = indexOf_metric(abbreviation);
+    if (!isValidIndex_metric(metricId)) return 0;
     if (enable) {
         if (options.enabledMetrics == ALL_METRICS_ENABLED) options.enabledMetrics = 0;
         options.enabledMetrics |= ((uint_fast64_t)1 << metricId);

@@ -1,33 +1,58 @@
-.TH man 1 "June 2023" "0.0.1" "srcMetrics"
+.TH man 1 "June 2023" "0.0.2" "srcMetrics"
 .SH NAME
-srcMetrics \- Calculates static metrics from C source code, srcML, or srcGraph files
+srcMetrics \- Calculates static metrics from C source code files.
 .SH SYNOPSIS
-srcmetrics [options] <src_infile>... [-o <srcMetrics_outfile>]
-srcmetrics [options] <srcML_infile>... [-o <srcMetrics_outfile>]
-srcmetrics [options] <srcGraph_infile>... [-o <srcMetrics_outfile>]
-.SH DESCRIPTION
+srcmetrics [options] <src_infile>...
 .SH OPTIONS
 GENERAL OPTIONS:
-  -h,--help                  Output this help message and exit
-  -V,--version               Output version number and exit
-  -v,--verbose               Status information to stderr
-  -c,--copyright             Output the copyright message and exit
-  -q,--quiet                 Suppress status messages
-  -o,--output FILE           Write output to FILE
-  -l,--language LANG         Set the source-code language to C
-  --files-from FILE          Input source-code filenames from FILE instead of command-line arguments
+  -h,--help                     Output this help message and exit
+  -V,--version                  Output version number and exit
+  -v,--verbose                  Status information to stderr
+  -c,--copyright                Output the copyright message and exit
+  -o,--output FILE              Write output to FILE
+  -l,--language LANG            Set the source-code language to C
+  -d,--delimeter DELIM          Change the CSV delimeter, default ','
+  --files-from FILE             Input source-code filenames from FILE instead of command-line arguments
 
-SRCMETRICS:
-  -m,--metric METRIC         Report this METRIC if possible, excludes all unspecified metrics
-  -e,--exclude METRIC        Exclude this METRIC from the output
+SRCMETRICS OPTIONS:
+  -a,--all-metrics              (Default) Report all metrics (implies '--RFU-show --CC-show')
+  -m,--metric METRIC            Report this METRIC if possible, excludes all unspecified metrics
+  -e,--exclude METRIC           Exclude this METRIC from the output
+  -f,--metrics-from FILE        Input enabled metrics from FILE
+  -x,--excluded-from FILE       Input excluded metrics from FILE
 
 METADATA OPTIONS:
-  -L,--list                  Output the list of supported metrics and exit
-  -s,--show METRIC           Output detailed information on METRIC and exit
+  -L,--list                     Output the list of supported metrics and exit
+  -s,--show METRIC              Output detailed information on METRIC and exit
+
+GRAPH OPTIONS:
+     --graph-enable-dot         (Default) Enables .dot output
+     --graph-disable-dot        Disables .dot output
+     --graph-enable-xml         (Default) Enables .xml output
+     --graph-disable-xml        Disables .xml output
+
+CALL GRAPH OPTIONS:
+     --no-cg                    (Default) Does NOT compute the call graph
+     --cg <graph_name>          Computes the call graph (implies '-m RFU --RFU-quiet')
+     --cg-no-external           (Default) Ignores external calls in the call graph
+     --cg-show-external         Shows external calls in the call graph
+
+CONTROL FLOW GRAPH OPTIONS:
+     --no-cfg                   (Default) Does NOT output control flow graphs
+     --cfg <graph_name>         Outputs the control flow graph (implies '-m CC --CC-quiet')
+     --ipcfg <graph_name>       Outputs the inter-procedural control flow graph (implies '-m CC --CC-quiet')
+
+RFU OPTIONS:
+     --RFU-show                 (Default) Show RFU metrics
+     --RFU-quiet                Do NOT output any RFU metrics (for CG generation)
+     --RFU-simple               (Default) Non-CG based RFU estimation
+     --RFU-transitive           CG based RFU estimation
+
+CC OPTIONS:
+     --CC-show                  (Default) Show CC metrics
+     --CC-quiet                 Do NOT output any CC metrics (for CFG generation)
 .SH SEE ALSO
 srcml(1), dot(1)
-.SH BUGS
-No known bugs.
 .SH AUTHOR
 Yavuz Koroglu
 .SH COPYRIGHT

@@ -1,3 +1,6 @@
+# Directory indices
+.DS_Store
+
 # Prerequisites
 *.d
 
@@ -17,10 +20,10 @@
 *.pch
 
 # Libraries
-*.lib
-*.a
-*.la
-*.lo
+#*.lib
+#*.a
+#*.la
+#*.lo
 
 # Binaries
 bin/**
@@ -30,10 +33,10 @@ html/**
 latex/**
 
 # Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
+#*.dll
+#*.so
+#*.so.*
+#*.dylib
 
 # Executables
 *.exe
@@ -53,6 +56,7 @@ latex/**
 *.gcno
 *.gcda
 *.gcov
+coverage.info
 
 # Program outputs
 *.csv
@@ -62,6 +66,7 @@ latex/**
 *.cg.xml
 *.cfg.dot
 *.cfg.xml
+*.pdf
 
 # Kernel Module Compile Results
 *.mod*
@@ -71,3 +76,7 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# PADKIT
+padkit/**
+padkit

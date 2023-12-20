@@ -13,15 +13,37 @@
     #define DESCRIPTION_OF_NOT_A_METRIC "Unknown Metric"
     #define METRICS_COUNT_MAX           64
 
-    #define METRICS {                   \
-        "NPM",                          \
-        "SLOC",                         \
-        NULL                            \
+    #define METRICS {                                                           \
+        "ABC",                                                                  \
+        "AMS",                                                                  \
+        "CC",                                                                   \
+        "HSM",                                                                  \
+        "MC",                                                                   \
+        "MND",                                                                  \
+        "NPM",                                                                  \
+        "RFU",                                                                  \
+        "SLOC",                                                                 \
+        NULL                                                                    \
     }
-    #define METRIC_DESCRIPTIONS {       \
-        "Number of Public Methods",     \
-        "Source Lines of Code",         \
-        NULL                            \
+    #define METRIC_DESCRIPTIONS {                                               \
+        "√(A²+B²+C²);\n"                                                        \
+            "            A: Assignments,\n"                                     \
+            "            B: Branches,\n"                                        \
+            "            C: Conditionals",                                      \
+        "Average Method Size",                                                  \
+        "Cyclomatic Complexity (needs Control-Flow Graph)",                     \
+        "Halstead Software Metrics;\n"                                          \
+            "            D: Difficulty,\n"                                      \
+            "            V: Volume,\n"                                          \
+            "            E: Effort,\n"                                          \
+            "            B: Expected Number of Bugs,\n"                         \
+            "            T: Time to Code (workdays)",                           \
+        "Method Count",                                                         \
+        "Maximum Nesting Depth",                                                \
+        "Number of Public Methods",                                             \
+        "Response for Unit",                                                    \
+        "Source Lines of Code",                                                 \
+        NULL                                                                    \
     }
 
     /**
@@ -29,14 +51,14 @@
      * @param abbreviation The metric abbreviation.
      * @return NOT_A_METRIC_ID if the metric does NOT exist, the metric index otherwise.
      */
-    size_t indexOf_metric(char const* const restrict abbreviation);
+    size_t indexOf_metric(char const* const abbreviation);
 
     /**
      * @brief Given its abbreviation, returns the description of a metric.
      * @param abbreviation The metric abbreviation.
      * @return DESCRIPTION_OF_NOT_A_METRIC if the metric does NOT exist, the metric description otherwise.
      */
-    char const* descriptionOf_metric(char const* const restrict abbreviation);
+    char const* descriptionOf_metric(char const* const abbreviation);
 
     /**
      * @brief Reports the list of all supported metrics.
@@ -56,5 +78,5 @@
      * @param enable Enables the metric if 1, excludes otherwise.
      * @return 0 if the metric does NOT exist, 1 otherwise.
      */
-    bool enableOrExclude_metric(char const* const restrict abbreviation, bool const enable);
+    bool enableOrExclude_metric(char const* const abbreviation, bool const enable);
 #endif

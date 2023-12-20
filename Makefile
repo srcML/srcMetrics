@@ -1,40 +1,55 @@
-# CCARGS=-std=c99 -DVERSION_SRCMETRICS=${VERSION_SRCMETRICS} -Wall -Wextra
-# CC=gcc-13
-VERSION_SRCMETRICS=0.0.1
-CCARGS=-std=c99 -DVERSION_SRCMETRICS=\"${VERSION_SRCMETRICS}\" -Weverything
-CC=clang
-COVARGS=--coverage -fprofile-arcs -ftest-coverage
-CFILES=src/util/*.c src/srcmetrics/*.c src/srcmetrics/metrics/*.c
-INCLUDES=-Iinclude
-LIBRARIES=-lsrcml -lsrcsax
-DEBUGFLAGS=-g
-SRCMETRICS=src/srcmetrics.c
-EXEC=bin/srcmetrics
-SILENCEDWARNINGS=-Wno-poison-system-directories -Wno-padded -Wno-unused-parameter
-COVERAGE=${CC} ${COVARGS} ${CCARGS} ${DEBUGFLAGS} ${INCLUDES} ${LIBRARIES} ${CFILES}
-DEBUG=${CC} ${CCARGS} ${DEBUGFLAGS} ${INCLUDES} ${LIBRARIES} ${CFILES}
+include padkit/compile.mk
 
-compile: ; @\
-    ${CC} -O2 ${CCARGS} ${SILENCEDWARNINGS} ${INCLUDES} ${LIBRARIES} ${CFILES} ${SRCMETRICS} -o ${EXEC}
+VERSION_SRCMETRICS=0.0.2
 
-release: clean bin compile documentation
+PREPROCESSOR_MACROS=                               \
+    -DVERSION_SRCMETRICS=\"${VERSION_SRCMETRICS}\" \
+    -DUNIT_COUNT_GUESS=1024                        \
+    -DFN_COUNT_GUESS=16384                         \
+    -DSTMT_COUNT_GUESS=524288                      \
+    -DLABEL_COUNT_GUESS=1024                       \
+    -DCALL_COUNT_GUESS=1024                        \
+    -DELEMENT_LEN_GUESS=16
 
-documentation: ; @\
-    doxygen
+INCS=-Iinclude -Ipadkit/include
+CFILES=src/*.c src/*/*.c src/*/*/*.c
 
-coverage: clean bin; @\
-    ${COVERAGE} ${SRCMETRICS} -o ${EXEC}
+SRCML_LIB=lib/${OS}/${ARCH}/libsrcml.a
+SRCSAX_LIB=lib/${OS}/${ARCH}/libsrcsax.a
 
-debug: clean bin; @\
-    ${DEBUG} ${SRCMETRICS} -o ${EXEC}
+DEBUG_LIBS=${PADKIT_DEBUG_LIB} ${SRCML_LIB} ${SRCSAX_LIB}
+RELEASE_LIBS=${PADKIT_LIB} ${SRCML_LIB} ${SRCSAX_LIB}
 
-bin: ; @\
-    mkdir bin
+LIBS=${SRCML_LIB} ${SRCSAX_LIB} padkit/lib/libpadkit.a
 
-tests: test230619
+ifeq (${OS},Darwin)
+BIN_SRCMETRICS=bin/srcmetrics
+else
+ifeq (${OS},Linux)
+BIN_SRCMETRICS=bin/srcmetrics
+else
+BIN_SRCMETRICS=bin/srcmetrics.exe
+endif
+endif
 
-test230619: clean bin; @\
-    ${COVERAGE} src/tests/test230619.c -o bin/test230619.out
+${BIN_SRCMETRICS}:          \
+    bin                     \
+    padkit/compile.mk       \
+    padkit/lib/libpadkit.a  \
+    ; ${COMPILE} ${PREPROCESSOR_MACROS} ${INCS} ${LIBS} ${CFILES} -o ${BIN_SRCMETRICS}
 
-clean: ; @\
-    rm -rf *.gcno *.gcda *.gcov bin/* html latex
+.PHONY: all clean documentation
+
+all: ${BIN_SRCMETRICS}
+
+bin: ; mkdir bin
+
+clean: ; rm -rf *.gcno *.gcda *.gcov bin/* html latex
+
+documentation: ; doxygen
+
+padkit: ; git clone https://github.com/yavuzkoroglu/padkit.git
+
+padkit/compile.mk: padkit; ${make padkit/compile.mk}
+
+padkit/lib/libpadkit.a: padkit; make -C padkit lib/libpadkit.a
