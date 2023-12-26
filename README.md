@@ -1,5 +1,9 @@
 # srcMetrics:
 
+## WARNING
+
+The Control Flow Graph functionality is broken! This message will be removed as soon as it is fixed.
+
 ## Table of Contents
 
 * [Get Started](#get-started)
