@@ -660,6 +660,9 @@ void constructEmpty_cparse(
     ChunkTable* const fns = cparse->tables + CPARSE_TABLE_FNS;
     DEBUG_ASSERT_NDEBUG_EXECUTE(constructEmpty_ctbl(fns, total_fn_count_guess, load_percent))
 
+    ChunkTable* const fn_first_stmt = cparse->tables + CPARSE_TABLE_FN_FIRST_STMT;
+    DEBUG_ASSERT_NDEBUG_EXECUTE(constructEmpty_ctbl(fn_first_stmt, total_fn_count_guess, load_percent))
+
     ChunkTable* const labels = cparse->tables + CPARSE_TABLE_LABELS;
     DEBUG_ASSERT_NDEBUG_EXECUTE(constructEmpty_ctbl(labels, initial_stack_cap, load_percent))
 

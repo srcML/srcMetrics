@@ -86,8 +86,7 @@
     #define CPARSE_TABLE_UNITS              0
     #define CPARSE_TABLE_FNS                1
     #define CPARSE_TABLE_FN_FIRST_STMT      2
-    #define CPARSE_TABLE_FN_LAST_STMT       3
-    #define CPARSE_TABLE_LABELS             4
+    #define CPARSE_TABLE_LABELS             3
     #define CPARSE_TABLE_LAST               CPARSE_TABLE_LABELS
     #define CPARSE_MAP_EDGES                0
     #define CPARSE_MAP_LAST                 CPARSE_MAP_EDGES
